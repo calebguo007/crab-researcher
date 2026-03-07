@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+.env.production
+.env.local
+*.egg-info/
+dist/
+node_modules/
+.venv/
+.vercel/

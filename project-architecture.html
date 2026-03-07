@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小蟹研究员 - 项目架构可视化</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-deep: #0a0e1a;
+    --bg-card: #111827;
+    --bg-card-hover: #1a2235;
+    --border: #1e2a3f;
+    --border-glow: #f97316;
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent-orange: #f97316;
+    --accent-blue: #3b82f6;
+    --accent-green: #10b981;
+    --accent-purple: #a855f7;
+    --accent-red: #ef4444;
+    --accent-cyan: #06b6d4;
+    --accent-yellow: #eab308;
+    --accent-pink: #ec4899;
+    --font-heading: 'Space Grotesk', 'Noto Sans SC', sans-serif;
+    --font-body: 'Noto Sans SC', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(249,115,22,0.03) 1px, transparent 1px),
+      linear-gradient(rgba(249,115,22,0.03) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 40px 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ============ HEADER ============ */
+  .header {
+    text-align: center;
+    margin-bottom: 60px;
+    position: relative;
+  }
+
+  .header::after {
+    content: '';
+    position: absolute;
+    bottom: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-orange), transparent);
+  }
+
+  .header h1 {
+    font-family: var(--font-heading);
+    font-size: 2.8rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: linear-gradient(135deg, var(--accent-orange), #fb923c, var(--accent-yellow));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+
+  .header .subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 300;
+  }
+
+  .header .badge {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 4px 14px;
+    background: rgba(249,115,22,0.1);
+    border: 1px solid rgba(249,115,22,0.3);
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--accent-orange);
+  }
+
+  /* ============ SECTION TITLES ============ */
+  .section-title {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-title .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  /* ============ TECH STACK ============ */
+  .tech-section { margin-bottom: 60px; }
+
+  .tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+  }
+
+  .tech-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .tech-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: 16px 16px 0 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .tech-card:hover {
+    border-color: rgba(249,115,22,0.3);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
+
+  .tech-card:hover::before { opacity: 1; }
+
+  .tech-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .tech-card-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+  }
+
+  .tech-card-title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1.05rem;
+  }
+
+  .tech-card-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .tech-list {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .tech-tag {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    padding: 3px 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+
+  .tech-tag.highlight {
+    background: rgba(249,115,22,0.1);
+    border-color: rgba(249,115,22,0.3);
+    color: var(--accent-orange);
+  }
+
+  /* Card color variants */
+  .card-backend::before { background: linear-gradient(90deg, var(--accent-green), var(--accent-cyan)); }
+  .card-frontend::before { background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple)); }
+  .card-infra::before { background: linear-gradient(90deg, var(--accent-orange), var(--accent-yellow)); }
+  .card-ai::before { background: linear-gradient(90deg, var(--accent-pink), var(--accent-purple)); }
+  .card-notify::before { background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue)); }
+
+  .icon-backend { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+  .icon-frontend { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+  .icon-infra { background: rgba(249,115,22,0.15); color: var(--accent-orange); }
+  .icon-ai { background: rgba(168,85,247,0.15); color: var(--accent-purple); }
+  .icon-notify { background: rgba(6,182,212,0.15); color: var(--accent-cyan); }
+
+  /* ============ ARCHITECTURE FLOW ============ */
+  .flow-section { margin-bottom: 60px; }
+
+  .flow-diagram {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .flow-diagram::before {
+    content: '';
+    position: absolute;
+    top: -100px;
+    right: -100px;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(249,115,22,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .flow-layers {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+  }
+
+  .flow-layer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 24px;
+    border-radius: 14px;
+    position: relative;
+    transition: background 0.3s;
+  }
+
+  .flow-layer:hover {
+    background: rgba(255,255,255,0.02);
+  }
+
+  .flow-layer-label {
+    width: 100px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .flow-layer-label .label-text {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+  }
+
+  .flow-layer-label .label-desc {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
+  .flow-nodes {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    flex: 1;
+  }
+
+  .flow-node {
+    padding: 10px 18px;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    transition: all 0.2s;
+    cursor: default;
+  }
+
+  .flow-node:hover {
+    transform: scale(1.05);
+  }
+
+  .flow-node .node-icon { font-size: 1rem; }
+
+  .node-user { background: rgba(249,115,22,0.1); border-color: rgba(249,115,22,0.3); color: #fb923c; }
+  .node-frontend { background: rgba(59,130,246,0.1); border-color: rgba(59,130,246,0.3); color: #60a5fa; }
+  .node-gateway { background: rgba(234,179,8,0.1); border-color: rgba(234,179,8,0.3); color: #facc15; }
+  .node-api { background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #34d399; }
+  .node-service { background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3); color: #c084fc; }
+  .node-data { background: rgba(6,182,212,0.1); border-color: rgba(6,182,212,0.3); color: #22d3ee; }
+  .node-external { background: rgba(236,72,153,0.1); border-color: rgba(236,72,153,0.3); color: #f472b6; }
+
+  /* Arrow connectors between layers */
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 0;
+    padding-left: 116px;
+  }
+
+  .flow-arrow svg {
+    width: 24px;
+    height: 24px;
+    color: var(--text-muted);
+    opacity: 0.5;
+  }
+
+  .flow-arrow .arrow-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-left: 8px;
+  }
+
+  /* ============ CALL FLOW ============ */
+  .callflow-section { margin-bottom: 60px; }
+
+  .callflow-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  .callflow-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .callflow-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    border-radius: 16px 0 0 16px;
+  }
+
+  .callflow-card.flow-price::before { background: var(--accent-green); }
+  .callflow-card.flow-sentiment::before { background: var(--accent-purple); }
+  .callflow-card.flow-newproduct::before { background: var(--accent-blue); }
+  .callflow-card.flow-report::before { background: var(--accent-orange); }
+
+  .callflow-title {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .callflow-steps {
+    list-style: none;
+    position: relative;
+  }
+
+  .callflow-steps::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 12px;
+    bottom: 12px;
+    width: 1px;
+    background: var(--border);
+  }
+
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 6px 0;
+    position: relative;
+  }
+
+  .step-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg-deep);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    flex-shrink: 0;
+    z-index: 1;
+  }
+
+  .step.active .step-dot {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+    box-shadow: 0 0 12px rgba(249,115,22,0.3);
+  }
+
+  .step-content {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    padding-top: 2px;
+  }
+
+  .step-content strong {
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .step-content code {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    background: rgba(255,255,255,0.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+    color: var(--accent-cyan);
+  }
+
+  /* ============ MODULE STATUS ============ */
+  .status-section { margin-bottom: 60px; }
+
+  .status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: all 0.2s;
+  }
+
+  .status-item:hover {
+    border-color: rgba(255,255,255,0.1);
+  }
+
+  .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-dot.done { background: var(--accent-green); box-shadow: 0 0 8px rgba(16,185,129,0.4); }
+  .status-dot.progress { background: var(--accent-yellow); box-shadow: 0 0 8px rgba(234,179,8,0.4); animation: pulse 2s infinite; }
+  .status-dot.todo { background: var(--text-muted); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .status-info { flex: 1; min-width: 0; }
+
+  .status-name {
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .status-detail {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .status-file {
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  /* ============ LEGEND ============ */
+  .legend {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+
+  /* ============ DATA FLOW DETAIL ============ */
+  .detail-section { margin-bottom: 60px; }
+
+  .detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-card);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .detail-table th {
+    padding: 14px 20px;
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .detail-table td {
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    vertical-align: top;
+  }
+
+  .detail-table tr:last-child td { border-bottom: none; }
+
+  .detail-table tr:hover td { background: rgba(255,255,255,0.015); }
+
+  .detail-table td code {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    background: rgba(249,115,22,0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: var(--accent-orange);
+  }
+
+  .port-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    background: rgba(59,130,246,0.1);
+    color: var(--accent-blue);
+  }
+
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 768px) {
+    .header h1 { font-size: 2rem; }
+    .tech-grid { grid-template-columns: 1fr; }
+    .callflow-container { grid-template-columns: 1fr; }
+    .flow-layer { flex-direction: column; align-items: flex-start; }
+    .flow-layer-label { width: auto; text-align: left; }
+    .flow-arrow { padding-left: 0; }
+    .container { padding: 20px 16px; }
+  }
+
+  /* ============ ANIMATIONS ============ */
+  .fade-in {
+    animation: fadeIn 0.6s ease-out forwards;
+    opacity: 0;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in:nth-child(1) { animation-delay: 0.05s; }
+  .fade-in:nth-child(2) { animation-delay: 0.1s; }
+  .fade-in:nth-child(3) { animation-delay: 0.15s; }
+  .fade-in:nth-child(4) { animation-delay: 0.2s; }
+  .fade-in:nth-child(5) { animation-delay: 0.25s; }
+  .fade-in:nth-child(6) { animation-delay: 0.3s; }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <div class="header fade-in">
+    <h1>🦀 小蟹研究员</h1>
+    <div class="subtitle">B2B AI 市场调研自动化助手 — 项目架构全景</div>
+    <div class="badge">crab-researcher v1.0 · 2026-03</div>
+  </div>
+
+  <!-- ===== TECH STACK ===== -->
+  <section class="tech-section">
+    <h2 class="section-title">
+      <span class="icon" style="background:rgba(249,115,22,0.15);color:var(--accent-orange)">⚙</span>
+      技术栈总览
+    </h2>
+    <div class="tech-grid">
+
+      <!-- Backend -->
+      <div class="tech-card card-backend fade-in">
+        <div class="tech-card-header">
+          <div class="tech-card-icon icon-backend">🐍</div>
+          <div>
+            <div class="tech-card-title">后端 · Backend</div>
+            <div class="tech-card-subtitle">:8002 / Python 3.12</div>
+          </div>
+        </div>
+        <ul class="tech-list">
+          <li class="tech-tag highlight">FastAPI 0.115</li>
+          <li class="tech-tag highlight">SQLAlchemy 2.0 async</li>
+          <li class="tech-tag">asyncpg</li>
+          <li class="tech-tag">Pydantic v2</li>
+          <li class="tech-tag">APScheduler</li>
+          <li class="tech-tag">httpx</li>
+          <li class="tech-tag">BeautifulSoup4</li>
+          <li class="tech-tag">PyJWT</li>
+          <li class="tech-tag">bcrypt</li>
+          <li class="tech-tag">Uvicorn ASGI</li>
+        </ul>
+      </div>
+
+      <!-- Frontend -->
+      <div class="tech-card card-frontend fade-in">
+        <div class="tech-card-header">
+          <div class="tech-card-icon icon-frontend">⚛</div>
+          <div>
+            <div class="tech-card-title">前端 · Frontend</div>
+            <div class="tech-card-subtitle">:3000 / Node 20</div>
+          </div>
+        </div>
+        <ul class="tech-list">
+          <li class="tech-tag highlight">React 18</li>
+          <li class="tech-tag highlight">TypeScript 5.5</li>
+          <li class="tech-tag">Vite 5.4</li>
+          <li class="tech-tag">Tailwind CSS 3.4</li>
+          <li class="tech-tag">Zustand</li>
+          <li class="tech-tag">TanStack Query</li>
+          <li class="tech-tag">Recharts</li>
+          <li class="tech-tag">React Router 6</li>
+          <li class="tech-tag">Lucide Icons</li>
+        </ul>
+      </div>
+
+      <!-- Infrastructure -->
+      <div class="tech-card card-infra fade-in">
+        <div class="tech-card-header">
+          <div class="tech-card-icon icon-infra">🐳</div>
+          <div>
+            <div class="tech-card-title">基础设施 · Infra</div>
+            <div class="tech-card-subtitle">Docker Compose</div>
+          </div>
+        </div>
+        <ul class="tech-list">
+          <li class="tech-tag highlight">PostgreSQL 16</li>
+          <li class="tech-tag highlight">pgvector</li>
+          <li class="tech-tag">Redis 7</li>
+          <li class="tech-tag">Nginx (反代+静态)</li>
+          <li class="tech-tag">Docker Compose</li>
+          <li class="tech-tag">Volume 持久化</li>
+        </ul>
+      </div>
+
+      <!-- AI/LLM -->
+      <div class="tech-card card-ai fade-in">
+        <div class="tech-card-header">
+          <div class="tech-card-icon icon-ai">🧠</div>
+          <div>
+            <div class="tech-card-title">AI · LLM 服务</div>
+            <div class="tech-card-subtitle">多模型 + 自动降级</div>
+          </div>
+        </div>
+        <ul class="tech-list">
+          <li class="tech-tag highlight">Moonshot (主力)</li>
+          <li class="tech-tag">OpenAI GPT-4o</li>
+          <li class="tech-tag">DeepSeek Chat</li>
+          <li class="tech-tag">4级成本控制</li>
+          <li class="tech-tag">自动降级链</li>
+          <li class="tech-tag">OpenAI SDK 兼容</li>
+        </ul>
+      </div>
+
+      <!-- Notification -->
+      <div class="tech-card card-notify fade-in">
+        <div class="tech-card-header">
+          <div class="tech-card-icon icon-notify">🔔</div>
+          <div>
+            <div class="tech-card-title">通知 · Notification</div>
+            <div class="tech-card-subtitle">Webhook 推送</div>
+          </div>
+        </div>
+        <ul class="tech-list">
+          <li class="tech-tag highlight">飞书卡片消息</li>
+          <li class="tech-tag">企业微信</li>
+          <li class="tech-tag">失败重试(3次)</li>
+          <li class="tech-tag">价格/舆情/新品模板</li>
+          <li class="tech-tag">每日摘要推送</li>
+        </ul>
+      </div>
+
+      <!-- Search / RAG -->
+      <div class="tech-card card-ai fade-in">
+        <div class="tech-card-header">
+          <div class="tech-card-icon icon-ai">🔍</div>
+          <div>
+            <div class="tech-card-title">检索 · RAG</div>
+            <div class="tech-card-subtitle">向量 + 关键词 + 混合</div>
+          </div>
+        </div>
+        <ul class="tech-list">
+          <li class="tech-tag highlight">pgvector 1536维</li>
+          <li class="tech-tag">向量检索</li>
+          <li class="tech-tag">关键词检索 ILIKE</li>
+          <li class="tech-tag">混合检索 RRF</li>
+          <li class="tech-tag">自动降级</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== ARCHITECTURE FLOW ===== -->
+  <section class="flow-section">
+    <h2 class="section-title">
+      <span class="icon" style="background:rgba(59,130,246,0.15);color:var(--accent-blue)">🏗</span>
+      系统架构 · 分层调用流
+    </h2>
+
+    <div class="flow-diagram">
+      <div class="flow-layers">
+
+        <!-- Layer 1: User -->
+        <div class="flow-layer">
+          <div class="flow-layer-label">
+            <div class="label-text">Layer 1</div>
+            <div class="label-desc">用户入口</div>
+          </div>
+          <div class="flow-nodes">
+            <div class="flow-node node-user"><span class="node-icon">👤</span> 浏览器访问</div>
+            <div class="flow-node node-user"><span class="node-icon">🤖</span> 飞书群</div>
+            <div class="flow-node node-user"><span class="node-icon">📡</span> API 直调</div>
+          </div>
+        </div>
+
+        <div class="flow-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <span class="arrow-label">HTTP / Webhook</span>
+        </div>
+
+        <!-- Layer 2: Frontend -->
+        <div class="flow-layer">
+          <div class="flow-layer-label">
+            <div class="label-text">Layer 2</div>
+            <div class="label-desc">前端展示</div>
+          </div>
+          <div class="flow-nodes">
+            <div class="flow-node node-frontend"><span class="node-icon">⚛</span> React SPA</div>
+            <div class="flow-node node-gateway"><span class="node-icon">🔀</span> Nginx 反代</div>
+          </div>
+        </div>
+
+        <div class="flow-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <span class="arrow-label">/api/* → :8002</span>
+        </div>
+
+        <!-- Layer 3: API Routes -->
+        <div class="flow-layer">
+          <div class="flow-layer-label">
+            <div class="label-text">Layer 3</div>
+            <div class="label-desc">API 路由</div>
+          </div>
+          <div class="flow-nodes">
+            <div class="flow-node node-api"><span class="node-icon">🔐</span> auth</div>
+            <div class="flow-node node-api"><span class="node-icon">📋</span> tasks</div>
+            <div class="flow-node node-api"><span class="node-icon">📊</span> monitoring</div>
+            <div class="flow-node node-api"><span class="node-icon">🏭</span> competitors</div>
+            <div class="flow-node node-api"><span class="node-icon">📝</span> reports</div>
+            <div class="flow-node node-api"><span class="node-icon">🔍</span> rag</div>
+            <div class="flow-node node-api"><span class="node-icon">⚙</span> system</div>
+          </div>
+        </div>
+
+        <div class="flow-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <span class="arrow-label">依赖注入 → Service 层</span>
+        </div>
+
+        <!-- Layer 4: Services -->
+        <div class="flow-layer">
+          <div class="flow-layer-label">
+            <div class="label-text">Layer 4</div>
+            <div class="label-desc">业务服务</div>
+          </div>
+          <div class="flow-nodes">
+            <div class="flow-node node-service"><span class="node-icon">🕷</span> Scraper</div>
+            <div class="flow-node node-service"><span class="node-icon">🧠</span> LLM</div>
+            <div class="flow-node node-service"><span class="node-icon">⏰</span> Scheduler</div>
+            <div class="flow-node node-service"><span class="node-icon">🔔</span> Notification</div>
+            <div class="flow-node node-service"><span class="node-icon">🔍</span> RAG</div>
+            <div class="flow-node node-service"><span class="node-icon">📊</span> Report</div>
+            <div class="flow-node node-service"><span class="node-icon">💰</span> CostCtrl</div>
+            <div class="flow-node node-service"><span class="node-icon">🏭</span> Discovery</div>
+          </div>
+        </div>
+
+        <div class="flow-arrow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <span class="arrow-label">ORM / HTTP / SDK</span>
+        </div>
+
+        <!-- Layer 5: Data & External -->
+        <div class="flow-layer">
+          <div class="flow-layer-label">
+            <div class="label-text">Layer 5</div>
+            <div class="label-desc">数据 & 外部</div>
+          </div>
+          <div class="flow-nodes">
+            <div class="flow-node node-data"><span class="node-icon">🐘</span> PostgreSQL + pgvector</div>
+            <div class="flow-node node-data"><span class="node-icon">⚡</span> Redis</div>
+            <div class="flow-node node-external"><span class="node-icon">🌐</span> 电商平台</div>
+            <div class="flow-node node-external"><span class="node-icon">🤖</span> Moonshot API</div>
+            <div class="flow-node node-external"><span class="node-icon">💬</span> 飞书 Webhook</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CALL FLOWS ===== -->
+  <section class="callflow-section">
+    <h2 class="section-title">
+      <span class="icon" style="background:rgba(16,185,129,0.15);color:var(--accent-green)">🔄</span>
+      核心调用流 · 4 大监测链路
+    </h2>
+
+    <div class="callflow-container">
+
+      <!-- Price Monitoring -->
+      <div class="callflow-card flow-price">
+        <div class="callflow-title">
+          <span style="color:var(--accent-green)">💰</span> 价格监测
+        </div>
+        <ol class="callflow-steps">
+          <li class="step active"><span class="step-dot">1</span><div class="step-content"><strong>Scheduler</strong> 每分钟扫描到期任务 <code>next_run_at ≤ now</code></div></li>
+          <li class="step"><span class="step-dot">2</span><div class="step-content"><strong>Scraper</strong> 三层策略: 直链抓取 → 搜索页解析 → LLM分析</div></li>
+          <li class="step"><span class="step-dot">3</span><div class="step-content"><strong>BeautifulSoup</strong> 解析HTML提取商品名+价格</div></li>
+          <li class="step"><span class="step-dot">4</span><div class="step-content">解析失败 → <strong>LLM</strong> 从页面文本提取 <code>Tier2</code></div></li>
+          <li class="step"><span class="step-dot">5</span><div class="step-content"><strong>_detect_price_change()</strong> 对比历史 &gt;10% 触发告警</div></li>
+          <li class="step"><span class="step-dot">6</span><div class="step-content"><strong>Notification</strong> → 飞书价格变动卡片（含链接）</div></li>
+          <li class="step"><span class="step-dot">7</span><div class="step-content">结果写入 <code>monitoring_results</code> 表</div></li>
+        </ol>
+      </div>
+
+      <!-- Sentiment Monitoring -->
+      <div class="callflow-card flow-sentiment">
+        <div class="callflow-title">
+          <span style="color:var(--accent-purple)">📢</span> 舆情监测
+        </div>
+        <ol class="callflow-steps">
+          <li class="step active"><span class="step-dot">1</span><div class="step-content"><strong>Scheduler</strong> 或手动 <code>POST /monitoring/sentiment</code></div></li>
+          <li class="step"><span class="step-dot">2</span><div class="step-content"><strong>Scraper</strong> 抓取微博/小红书搜索页</div></li>
+          <li class="step"><span class="step-dot">3</span><div class="step-content">提取帖子文本 → 传入 <strong>LLM</strong> 做情感分析</div></li>
+          <li class="step"><span class="step-dot">4</span><div class="step-content">返回: 情感评分(0-1) + 热门话题 + 提及量</div></li>
+          <li class="step"><span class="step-dot">5</span><div class="step-content">评分 &lt;0.4 或提及 &gt;300 → 触发 <code>sentiment_spike</code></div></li>
+          <li class="step"><span class="step-dot">6</span><div class="step-content"><strong>Notification</strong> → 飞书舆情预警卡片</div></li>
+        </ol>
+      </div>
+
+      <!-- New Product -->
+      <div class="callflow-card flow-newproduct">
+        <div class="callflow-title">
+          <span style="color:var(--accent-blue)">🆕</span> 新品监测
+        </div>
+        <ol class="callflow-steps">
+          <li class="step active"><span class="step-dot">1</span><div class="step-content"><strong>Scheduler</strong> 或手动 <code>POST /monitoring/new_product</code></div></li>
+          <li class="step"><span class="step-dot">2</span><div class="step-content"><strong>Scraper</strong> 抓取当前搜索结果商品列表</div></li>
+          <li class="step"><span class="step-dot">3</span><div class="step-content"><strong>_detect_new_products()</strong> 对比最近5次历史数据</div></li>
+          <li class="step"><span class="step-dot">4</span><div class="step-content">不在历史中的商品 → 标记为新品</div></li>
+          <li class="step"><span class="step-dot">5</span><div class="step-content"><strong>Notification</strong> → 飞书新品发现卡片</div></li>
+        </ol>
+      </div>
+
+      <!-- Report Generation -->
+      <div class="callflow-card flow-report">
+        <div class="callflow-title">
+          <span style="color:var(--accent-orange)">📝</span> 报告生成
+        </div>
+        <ol class="callflow-steps">
+          <li class="step active"><span class="step-dot">1</span><div class="step-content">用户调用 <code>POST /reports/generate</code></div></li>
+          <li class="step"><span class="step-dot">2</span><div class="step-content"><strong>ReportGenerator</strong> 收集监测数据 + 竞品数据</div></li>
+          <li class="step"><span class="step-dot">3</span><div class="step-content"><strong>RAG</strong> 混合检索知识库，增强上下文</div></li>
+          <li class="step"><span class="step-dot">4</span><div class="step-content"><strong>LLM</strong> 生成 Markdown 报告 <code>Tier3/4</code></div></li>
+          <li class="step"><span class="step-dot">5</span><div class="step-content"><strong>CostController</strong> 记录 Token 消耗 + 费用</div></li>
+          <li class="step"><span class="step-dot">6</span><div class="step-content">存入 <code>reports</code> 表，返回完整报告</div></li>
+        </ol>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ===== MODULE STATUS ===== -->
+  <section class="status-section">
+    <h2 class="section-title">
+      <span class="icon" style="background:rgba(234,179,8,0.15);color:var(--accent-yellow)">📦</span>
+      模块完成度 · 26 个 Python 文件
+    </h2>
+
+    <div class="legend">
+      <div class="legend-item"><div class="status-dot done"></div> 已完成 / 生产可用</div>
+      <div class="legend-item"><div class="status-dot progress"></div> 本轮刚完成改造</div>
+      <div class="legend-item"><div class="status-dot todo"></div> 待开发</div>
+    </div>
+
+    <div class="status-grid">
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">用户认证 (JWT + bcrypt)</div><div class="status-detail">注册/登录/鉴权</div></div><div class="status-file">auth.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">任务管理 CRUD</div><div class="status-detail">创建/列表/更新/删除</div></div><div class="status-file">tasks.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">竞品发现引擎</div><div class="status-detail">LLM驱动 7个端点</div></div><div class="status-file">competitors.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">LLM 统一调用层</div><div class="status-detail">多模型+自动降级</div></div><div class="status-file">llm_service.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">成本控制器</div><div class="status-detail">4级选模+预算管理</div></div><div class="status-file">cost_controller.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">RAG 混合检索</div><div class="status-detail">向量+关键词+RRF融合</div></div><div class="status-file">rag_service.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">报告生成器</div><div class="status-detail">数据收集→RAG→LLM</div></div><div class="status-file">report_generator.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">系统健康检查</div><div class="status-detail">状态/预算/仪表盘</div></div><div class="status-file">system.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">ORM 数据模型</div><div class="status-detail">9张表 + 关联关系</div></div><div class="status-file">task.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">应用配置</div><div class="status-detail">Pydantic Settings</div></div><div class="status-file">config.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">安全认证</div><div class="status-detail">JWT+APIKey+域名白名单</div></div><div class="status-file">security.py</div></div>
+      <div class="status-item"><div class="status-dot done"></div><div class="status-info"><div class="status-name">数据库连接</div><div class="status-detail">异步引擎+连接池</div></div><div class="status-file">database.py</div></div>
+
+      <div class="status-item" style="border-color:rgba(234,179,8,0.3)"><div class="status-dot progress"></div><div class="status-info"><div class="status-name">数据抓取引擎 ⭐</div><div class="status-detail">HTTP抓取+LLM解析(刚改造)</div></div><div class="status-file">scraper.py</div></div>
+      <div class="status-item" style="border-color:rgba(234,179,8,0.3)"><div class="status-dot progress"></div><div class="status-info"><div class="status-name">通知服务 ⭐</div><div class="status-detail">重试+飞书卡片(刚改造)</div></div><div class="status-file">notification.py</div></div>
+      <div class="status-item" style="border-color:rgba(234,179,8,0.3)"><div class="status-dot progress"></div><div class="status-info"><div class="status-name">调度器 ⭐</div><div class="status-detail">失败重试+自动暂停(刚改造)</div></div><div class="status-file">scheduler.py</div></div>
+      <div class="status-item" style="border-color:rgba(234,179,8,0.3)"><div class="status-dot progress"></div><div class="status-info"><div class="status-name">监测API ⭐</div><div class="status-detail">+promotion端点(刚改造)</div></div><div class="status-file">monitoring.py</div></div>
+      <div class="status-item" style="border-color:rgba(234,179,8,0.3)"><div class="status-dot progress"></div><div class="status-info"><div class="status-name">数据Schema ⭐</div><div class="status-detail">放开硬编码限制(刚改造)</div></div><div class="status-file">schemas.py</div></div>
+
+      <div class="status-item"><div class="status-dot todo"></div><div class="status-info"><div class="status-name">竞品对比 API</div><div class="status-detail">参数提取+对比表</div></div><div class="status-file">待开发</div></div>
+      <div class="status-item"><div class="status-dot todo"></div><div class="status-info"><div class="status-name">前端 Redesign</div><div class="status-detail">Dashboard 重构</div></div><div class="status-file">App.tsx</div></div>
+    </div>
+  </section>
+
+  <!-- ===== PORTS & SERVICES TABLE ===== -->
+  <section class="detail-section">
+    <h2 class="section-title">
+      <span class="icon" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan)">🔌</span>
+      服务端口 & 容器编排
+    </h2>
+
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>服务</th>
+          <th>容器名</th>
+          <th>镜像</th>
+          <th>端口</th>
+          <th>作用</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>PostgreSQL</strong></td>
+          <td><code>crab-postgres</code></td>
+          <td>pgvector/pgvector:pg16</td>
+          <td><span class="port-badge">5432</span></td>
+          <td>关系数据 + 向量存储 (pgvector)</td>
+        </tr>
+        <tr>
+          <td><strong>Redis</strong></td>
+          <td><code>crab-redis</code></td>
+          <td>redis:7-alpine</td>
+          <td><span class="port-badge">6379</span></td>
+          <td>缓存（暂未深度使用）</td>
+        </tr>
+        <tr>
+          <td><strong>FastAPI 后端</strong></td>
+          <td><code>crab-api</code></td>
+          <td>自建 python:3.12-slim</td>
+          <td><span class="port-badge">8002</span></td>
+          <td>REST API + 内置调度器</td>
+        </tr>
+        <tr>
+          <td><strong>React 前端</strong></td>
+          <td><code>crab-frontend</code></td>
+          <td>自建 nginx:alpine</td>
+          <td><span class="port-badge">3000 → 80</span></td>
+          <td>SPA 静态服务 + API 反代</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== API ENDPOINTS TABLE ===== -->
+  <section class="detail-section">
+    <h2 class="section-title">
+      <span class="icon" style="background:rgba(168,85,247,0.15);color:var(--accent-purple)">🛣</span>
+      API 端点一览 · 7 大模块 28+ 端点
+    </h2>
+
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>模块</th>
+          <th>端点</th>
+          <th>方法</th>
+          <th>说明</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td rowspan="3"><strong>auth</strong></td><td><code>/api/auth/register</code></td><td>POST</td><td>用户注册</td></tr>
+        <tr><td><code>/api/auth/login</code></td><td>POST</td><td>用户登录 → JWT Token</td></tr>
+        <tr><td><code>/api/auth/profile</code></td><td>GET</td><td>当前用户信息</td></tr>
+
+        <tr><td rowspan="5"><strong>tasks</strong></td><td><code>/api/tasks/create</code></td><td>POST</td><td>创建监测任务（自由输入平台/类型）</td></tr>
+        <tr><td><code>/api/tasks/list</code></td><td>GET</td><td>分页获取任务列表</td></tr>
+        <tr><td><code>/api/tasks/{id}/update</code></td><td>PUT</td><td>更新任务</td></tr>
+        <tr><td><code>/api/tasks/{id}</code></td><td>DELETE</td><td>删除任务</td></tr>
+        <tr><td><code>/api/tasks/{id}/results</code></td><td>GET</td><td>分页获取执行结果</td></tr>
+
+        <tr><td rowspan="4"><strong>monitoring</strong></td><td><code>/api/monitoring/price</code></td><td>POST</td><td>手动触发价格监测</td></tr>
+        <tr><td><code>/api/monitoring/promotion</code></td><td>POST</td><td>手动触发促销监测 ⭐ 新增</td></tr>
+        <tr><td><code>/api/monitoring/sentiment</code></td><td>POST</td><td>手动触发舆情分析</td></tr>
+        <tr><td><code>/api/monitoring/new_product</code></td><td>POST</td><td>手动触发新品检测</td></tr>
+
+        <tr><td rowspan="3"><strong>competitors</strong></td><td><code>/api/competitors/products</code></td><td>POST/GET</td><td>产品管理</td></tr>
+        <tr><td><code>/api/competitors/products/{id}/discover</code></td><td>POST</td><td>LLM 竞品发现</td></tr>
+        <tr><td><code>/api/competitors/candidates/*</code></td><td>GET/PUT/POST</td><td>候选确认/拒绝/批量</td></tr>
+
+        <tr><td rowspan="2"><strong>reports</strong></td><td><code>/api/reports/generate</code></td><td>POST</td><td>生成分析报告</td></tr>
+        <tr><td><code>/api/reports/list</code></td><td>GET</td><td>报告列表</td></tr>
+
+        <tr><td rowspan="2"><strong>rag</strong></td><td><code>/api/rag/upload</code></td><td>POST</td><td>上传文档到知识库</td></tr>
+        <tr><td><code>/api/rag/search</code></td><td>POST</td><td>向量/关键词/混合检索</td></tr>
+
+        <tr><td rowspan="4"><strong>system</strong></td><td><code>/api/system/health</code></td><td>GET</td><td>健康检查</td></tr>
+        <tr><td><code>/api/system/scheduler/status</code></td><td>GET</td><td>调度器状态+最近执行</td></tr>
+        <tr><td><code>/api/system/dashboard/alerts</code></td><td>GET</td><td>告警列表</td></tr>
+        <tr><td><code>/api/system/dashboard/price-trends</code></td><td>GET</td><td>价格趋势数据</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ===== DB TABLES ===== -->
+  <section class="detail-section">
+    <h2 class="section-title">
+      <span class="icon" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan)">🗄</span>
+      数据库表结构 · 9 张核心表
+    </h2>
+
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>表名</th>
+          <th>ORM 模型</th>
+          <th>说明</th>
+          <th>关键字段</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><code>users</code></td><td>User</td><td>企业客户</td><td>company_name, email, password, plan, budget</td></tr>
+        <tr><td><code>monitoring_tasks</code></td><td>MonitoringTask</td><td>监测任务</td><td>brand, platform, type, frequency, keywords, product_url</td></tr>
+        <tr><td><code>monitoring_results</code></td><td>MonitoringResult</td><td>执行结果</td><td>data(JSON), change_detected, severity</td></tr>
+        <tr><td><code>reports</code></td><td>Report</td><td>分析报告</td><td>content(Markdown), model_used, token_cost</td></tr>
+        <tr><td><code>rag_documents</code></td><td>RAGDocument</td><td>知识库文档</td><td>content, embedding(Vector 1536), metadata</td></tr>
+        <tr><td><code>token_usage_logs</code></td><td>TokenUsageLog</td><td>Token消耗日志</td><td>model, tokens, cost_cny</td></tr>
+        <tr><td><code>user_products</code></td><td>UserProduct</td><td>用户产品</td><td>name, industry, category, keywords, platforms</td></tr>
+        <tr><td><code>competitor_discoveries</code></td><td>CompetitorDiscovery</td><td>竞品候选</td><td>brand, price, relevance_score, status</td></tr>
+        <tr><td><code>competitor_products</code></td><td>CompetitorProduct</td><td>已确认竞品</td><td>brand, price, promo_price, specs, features</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</div>
+
+</body>
+</html>

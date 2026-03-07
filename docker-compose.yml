@@ -1,0 +1,67 @@
+# ==============================================
+# 小蟹研究员 - Docker Compose 一键部署
+# 启动: docker compose up -d
+# ==============================================
+
+services:
+  # -------- PostgreSQL + pgvector --------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: crab-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-crab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-crab_secret_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-crab_researcher}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crab"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # -------- Redis --------
+  redis:
+    image: redis:7-alpine
+    container_name: crab-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+  # -------- FastAPI 后端 --------
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: crab-api
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8002 --reload
+
+  # -------- React 前端 --------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: crab-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  redisdata:
