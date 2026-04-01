@@ -6,6 +6,8 @@
 
 import { useState, useEffect } from 'react'
 import { Surface } from './pages/Surface'
+import { Chat } from './pages/Chat'
+import { Plan } from './pages/Plan'
 import { getToken, setToken, clearToken, setAuthExpiredHandler, api } from './lib/api'
 import { generateCreature } from './components/creature/types'
 import type { CreatureState } from './components/creature/types'
@@ -162,21 +164,11 @@ export default function App() {
 
   // TODO: 实现 Chat 和 Plan 页面
   if (page === 'chat') {
-    return (
-      <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4">
-        <p className="text-muted text-sm mb-4">Chat page coming soon...</p>
-        <button onClick={() => setPage('surface')} className="btn-ghost">← Back</button>
-      </div>
-    )
+    return <Chat creature={creature} onBack={() => setPage('surface')} />
   }
 
   if (page === 'plan') {
-    return (
-      <div className="min-h-screen bg-surface flex flex-col items-center justify-center px-4">
-        <p className="text-muted text-sm mb-4">Growth Plan page coming soon...</p>
-        <button onClick={() => setPage('surface')} className="btn-ghost">← Back</button>
-      </div>
-    )
+    return <Plan creature={creature} onBack={() => setPage('surface')} />
   }
 
   return (
