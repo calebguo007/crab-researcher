@@ -5,9 +5,10 @@
  * 极致 calm：螃蟹 + 3 个数字 + 今日任务 + 最新发现。
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CreatureRenderer } from '../components/creature/CreatureRenderer'
 import type { CreatureState } from '../components/creature/types'
+import { api } from '../lib/api'
 
 interface SurfaceProps {
   creature: CreatureState
@@ -17,6 +18,22 @@ interface SurfaceProps {
 
 export function Surface({ creature, onChat, onPlan }: SurfaceProps) {
   const greeting = getGreeting(creature)
+  const [discoveries, setDiscoveries] = useState<any[]>([])
+
+  // 每 60 秒轮询 Daemon 发现
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const res = await api<any>('/agent/discoveries')
+        if (res.discoveries?.length > 0) {
+          setDiscoveries(prev => [...res.discoveries, ...prev].slice(0, 5))
+        }
+      } catch {}
+    }
+    poll()
+    const interval = setInterval(poll, 60_000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center px-4 py-8 max-w-lg mx-auto">
@@ -75,10 +92,18 @@ export function Surface({ creature, onChat, onPlan }: SurfaceProps) {
       <div className="w-full mb-8">
         <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3">Discoveries</h3>
         <div className="space-y-2">
-          <DiscoveryCard
-            title="Competitor dropped price 20%"
-            action="Let me analyze"
-          />
+          {discoveries.length > 0 ? discoveries.map((d, i) => (
+            <DiscoveryCard
+              key={i}
+              title={d.title || d.change || d.competitor || 'New discovery'}
+              action={d.url ? 'View' : 'Analyze'}
+            />
+          )) : (
+            <div className="text-center py-6 text-sm text-muted">
+              Your growth daemon is scanning...<br />
+              <span className="text-xs">Discoveries will appear here.</span>
+            </div>
+          )}
         </div>
       </div>
 
