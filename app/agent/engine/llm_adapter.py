@@ -1,19 +1,54 @@
 """
-Agent LLM 适配器
+CrabRes LLM 适配器 — OpenRouter 为主力
 
-把现有的 LLMService 包装成 Agent 引擎需要的接口。
-支持：
-- 普通对话（chat）
-- 带工具调用的对话（chat with tools）
-- 流式输出（streaming）
+=== 模型分级策略 ===
 
-复用现有的多模型降级链和成本控制。
+我们有 5 个等级的任务，每个对应不同成本的模型。
+核心原则：花最少的钱达到最好的效果。
+
+Tier 1: CRITICAL — 首席增长官的核心决策
+  模型: claude-sonnet-4 ($3/$15 per M tokens)
+  场景: Coordinator 判断阶段、关键策略决策、验证产品方向
+  预算: 每次对话最多 5 次 Tier1 调用
+  为什么用贵的: 这是"大脑"，决策质量直接决定策略好坏
+
+Tier 2: THINKING — 深度研究和策略制定
+  模型: deepseek/deepseek-chat-v3-0324 ($0.27/$1.10)
+  场景: 竞品深度分析、用户画像生成、策略制定、SWOT 分析
+  预算: 不限次数，但单次 max_tokens 控制在 4096
+  为什么: DeepSeek V3 性价比极高，推理能力接近 GPT-4
+
+Tier 3: WRITING — 文案创作
+  模型: deepseek/deepseek-chat-v3-0324 ($0.27/$1.10)
+  场景: 社媒帖子、邮件、博客文章、广告文案
+  预算: 按产出控制（一次生成不超过 5 篇）
+  为什么: DeepSeek 中英文都好，成本极低
+
+Tier 4: PARSING — 工具结果解析、格式化
+  模型: google/gemini-2.5-flash ($0.15/$0.60)
+  场景: 搜索结果解析、网页内容提取、JSON 格式化、简单判断
+  预算: 不限
+  为什么: 最便宜且足够快，这些任务不需要高智能
+
+Tier 5: EMBEDDING — 向量化
+  模型: openai/text-embedding-3-small ($0.02/M)
+  场景: 记忆检索、相似度匹配
+  预算: 按需
+  
+=== 降级策略 ===
+每个 Tier 有降级链：如果首选模型失败，自动切换到下一个。
+
+Tier 1: claude-sonnet-4 → deepseek-chat-v3 → moonshot-v1-128k
+Tier 2: deepseek-chat-v3 → moonshot-v1-128k → gemini-2.5-flash
+Tier 3: deepseek-chat-v3 → moonshot-v1-128k
+Tier 4: gemini-2.5-flash → deepseek-chat-v3
 """
 
 import json
 import logging
 from typing import Any, Optional
 from dataclasses import dataclass, field
+from enum import Enum
 
 from openai import AsyncOpenAI
 from app.core.config import get_settings
@@ -22,100 +57,217 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 
 
+class TaskTier(str, Enum):
+    """任务分级"""
+    CRITICAL = "critical"    # Coordinator 核心决策
+    THINKING = "thinking"    # 深度研究和分析
+    WRITING = "writing"      # 文案创作
+    PARSING = "parsing"      # 解析和格式化
+    EMBEDDING = "embedding"  # 向量化
+
+
+@dataclass
+class ModelSpec:
+    """模型规格"""
+    id: str                          # OpenRouter model ID
+    display_name: str                # 显示名
+    input_cost_per_m: float          # $/M input tokens
+    output_cost_per_m: float         # $/M output tokens
+    max_tokens: int = 4096           # 默认 max_tokens
+    supports_tools: bool = True      # 是否支持 function calling
+    provider: str = "openrouter"     # openrouter / moonshot
+
+
+# ===== 模型注册表 =====
+MODELS: dict[str, ModelSpec] = {
+    # Tier 1: CRITICAL
+    "claude-sonnet-4": ModelSpec(
+        id="anthropic/claude-sonnet-4",
+        display_name="Claude Sonnet 4",
+        input_cost_per_m=3.0,
+        output_cost_per_m=15.0,
+        max_tokens=8192,
+    ),
+    # Tier 2 & 3: THINKING + WRITING
+    "deepseek-v3": ModelSpec(
+        id="deepseek/deepseek-chat-v3-0324",
+        display_name="DeepSeek V3",
+        input_cost_per_m=0.27,
+        output_cost_per_m=1.10,
+        max_tokens=4096,
+    ),
+    # Tier 4: PARSING
+    "gemini-flash": ModelSpec(
+        id="google/gemini-2.5-flash",
+        display_name="Gemini 2.5 Flash",
+        input_cost_per_m=0.15,
+        output_cost_per_m=0.60,
+        max_tokens=4096,
+    ),
+    # 降级备选: Moonshot（不走 OpenRouter）
+    "moonshot": ModelSpec(
+        id="moonshot-v1-128k",
+        display_name="Moonshot V1 128K",
+        input_cost_per_m=0.8,  # 约 ¥0.012/千tokens
+        output_cost_per_m=0.8,
+        max_tokens=4096,
+        provider="moonshot",
+    ),
+}
+
+# ===== Tier → 模型降级链 =====
+TIER_CHAIN: dict[TaskTier, list[str]] = {
+    TaskTier.CRITICAL: ["claude-sonnet-4", "deepseek-v3", "moonshot"],
+    TaskTier.THINKING: ["deepseek-v3", "moonshot", "gemini-flash"],
+    TaskTier.WRITING:  ["deepseek-v3", "moonshot"],
+    TaskTier.PARSING:  ["gemini-flash", "deepseek-v3"],
+}
+
+
 @dataclass
 class LLMResponse:
     """LLM 响应"""
     content: str = ""
     tool_calls: list[dict] = field(default_factory=list)
     model: str = ""
+    model_display: str = ""
     tokens_used: int = 0
-    cost: float = 0.0
+    cost_usd: float = 0.0
+
+
+@dataclass
+class UsageTracker:
+    """成本追踪"""
+    total_tokens: int = 0
+    total_cost_usd: float = 0.0
+    calls_by_tier: dict = field(default_factory=lambda: {t.value: 0 for t in TaskTier})
+    tokens_by_tier: dict = field(default_factory=lambda: {t.value: 0 for t in TaskTier})
+    cost_by_tier: dict = field(default_factory=lambda: {t.value: 0.0 for t in TaskTier})
 
 
 class AgentLLM:
     """
-    Agent 专用 LLM 接口
+    CrabRes Agent LLM 接口
     
-    和 LLMService 的区别：
-    - 不需要 db session（Agent 引擎自己管理成本追踪）
-    - 支持 tool_use 格式
-    - 支持 system prompt + messages 分离
-    - 更轻量，专注于 Agent 的需要
+    主力走 OpenRouter（一个 key 访问所有模型）。
+    Moonshot 作为最后降级。
+    
+    使用规则：
+    1. Coordinator（首席增长官）的决策用 Tier CRITICAL
+    2. 专家的深度分析用 Tier THINKING
+    3. 文案生成用 Tier WRITING
+    4. 工具结果解析用 Tier PARSING
+    5. 每个 Tier 有降级链，首选挂了自动切下一个
+    6. 成本实时追踪，接近预算时自动降级到更便宜的模型
     """
 
-    def __init__(self):
-        self._client: Optional[AsyncOpenAI] = None
-        self._model = "moonshot-v1-128k"  # 默认模型
-        self._base_url = "https://api.moonshot.cn/v1"
-        self._api_key = settings.MOONSHOT_API_KEY
-        self._total_tokens = 0
-        self._total_cost = 0.0
-
-        # 降级链
-        self._fallback_configs = []
-        if settings.DEEPSEEK_API_KEY:
-            self._fallback_configs.append({
-                "model": "deepseek-chat",
-                "base_url": "https://api.deepseek.com",
-                "api_key": settings.DEEPSEEK_API_KEY,
-            })
-        if settings.OPENAI_API_KEY:
-            self._fallback_configs.append({
-                "model": "gpt-4o-mini",
-                "base_url": None,
-                "api_key": settings.OPENAI_API_KEY,
-            })
+    def __init__(self, budget_limit_usd: float = 1.0):
+        """
+        Args:
+            budget_limit_usd: 单次会话的美元预算上限（默认 $1）
+        """
+        self._openrouter_client: Optional[AsyncOpenAI] = None
+        self._moonshot_client: Optional[AsyncOpenAI] = None
+        self.usage = UsageTracker()
+        self.budget_limit = budget_limit_usd
 
     @property
-    def client(self) -> AsyncOpenAI:
-        if self._client is None:
-            self._client = AsyncOpenAI(
-                api_key=self._api_key,
-                base_url=self._base_url,
+    def openrouter(self) -> AsyncOpenAI:
+        if self._openrouter_client is None:
+            self._openrouter_client = AsyncOpenAI(
+                api_key=settings.OPENROUTER_API_KEY,
+                base_url="https://openrouter.ai/api/v1",
+                default_headers={
+                    "HTTP-Referer": "https://crabres.com",
+                    "X-Title": "CrabRes",
+                },
             )
-        return self._client
+        return self._openrouter_client
 
     @property
-    def total_tokens(self) -> int:
-        return self._total_tokens
+    def moonshot(self) -> AsyncOpenAI:
+        if self._moonshot_client is None:
+            self._moonshot_client = AsyncOpenAI(
+                api_key=settings.MOONSHOT_API_KEY,
+                base_url="https://api.moonshot.cn/v1",
+            )
+        return self._moonshot_client
 
-    @property
-    def total_cost(self) -> float:
-        return self._total_cost
+    def _get_client(self, spec: ModelSpec) -> AsyncOpenAI:
+        if spec.provider == "moonshot":
+            return self.moonshot
+        return self.openrouter
 
     async def generate(
         self,
         system_prompt: str,
         messages: list[dict],
+        tier: TaskTier = TaskTier.THINKING,
         tools: list[dict] | None = None,
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """
-        生成响应
+        生成响应，自动按 Tier 选模型
         
         Args:
-            system_prompt: 系统提示（Coordinator/专家的 prompt）
+            system_prompt: 系统提示
             messages: 对话历史
-            tools: 可用工具列表（OpenAI function calling 格式）
+            tier: 任务分级（决定用哪个模型）
+            tools: 可用工具（function calling 格式）
             temperature: 温度
-            max_tokens: 最大 token
-            
-        Returns:
-            LLMResponse: 包含 content 和/或 tool_calls
+            max_tokens: 覆盖默认 max_tokens
         """
+        # 预算检查：如果接近上限，强制降级
+        effective_tier = self._maybe_downgrade_tier(tier)
+        chain = TIER_CHAIN.get(effective_tier, TIER_CHAIN[TaskTier.PARSING])
+
+        for model_key in chain:
+            spec = MODELS[model_key]
+            try:
+                result = await self._call(
+                    spec=spec,
+                    system_prompt=system_prompt,
+                    messages=messages,
+                    tools=tools,
+                    temperature=temperature,
+                    max_tokens=max_tokens or spec.max_tokens,
+                )
+                # 记录成本
+                self._track_usage(tier, spec, result)
+                return result
+
+            except Exception as e:
+                logger.warning(f"[LLM] {spec.display_name} failed: {e}, trying next...")
+                continue
+
+        # 全部失败
+        return LLMResponse(
+            content="[系统] 所有模型调用失败，请检查 API Key 或网络。",
+            model="error",
+        )
+
+    async def _call(
+        self,
+        spec: ModelSpec,
+        system_prompt: str,
+        messages: list[dict],
+        tools: list[dict] | None,
+        temperature: float,
+        max_tokens: int,
+    ) -> LLMResponse:
+        """执行单次 LLM 调用"""
+        client = self._get_client(spec)
         full_messages = [{"role": "system", "content": system_prompt}] + messages
 
-        # 构建请求参数
         kwargs: dict[str, Any] = {
-            "model": self._model,
+            "model": spec.id,
             "messages": full_messages,
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
 
-        # 如果有工具，转成 OpenAI function calling 格式
-        if tools:
+        if tools and spec.supports_tools:
             kwargs["tools"] = [
                 {
                     "type": "function",
@@ -129,25 +281,26 @@ class AgentLLM:
             ]
             kwargs["tool_choice"] = "auto"
 
-        try:
-            response = await self.client.chat.completions.create(**kwargs)
-            return self._parse_response(response)
-        except Exception as e:
-            logger.error(f"[AgentLLM] Primary model failed: {e}")
-            return await self._fallback(full_messages, tools, temperature, max_tokens)
+        response = await client.chat.completions.create(**kwargs)
+        return self._parse(response, spec)
 
-    def _parse_response(self, response) -> LLMResponse:
-        """解析 OpenAI 格式响应"""
+    def _parse(self, response, spec: ModelSpec) -> LLMResponse:
+        """解析响应"""
         choice = response.choices[0]
         usage = response.usage
-
         tokens = usage.total_tokens if usage else 0
-        self._total_tokens += tokens
+
+        # 估算成本
+        input_tokens = usage.prompt_tokens if usage else 0
+        output_tokens = usage.completion_tokens if usage else 0
+        cost = (input_tokens * spec.input_cost_per_m + output_tokens * spec.output_cost_per_m) / 1_000_000
 
         result = LLMResponse(
             content=choice.message.content or "",
-            model=response.model,
+            model=spec.id,
+            model_display=spec.display_name,
             tokens_used=tokens,
+            cost_usd=cost,
         )
 
         # 解析 tool calls
@@ -165,52 +318,48 @@ class AgentLLM:
 
         return result
 
-    async def _fallback(
-        self,
-        messages: list[dict],
-        tools: list[dict] | None,
-        temperature: float,
-        max_tokens: int,
-    ) -> LLMResponse:
-        """降级到备选模型"""
-        for config in self._fallback_configs:
-            try:
-                logger.info(f"[AgentLLM] Falling back to {config['model']}")
-                client = AsyncOpenAI(
-                    api_key=config["api_key"],
-                    base_url=config.get("base_url"),
-                )
+    def _track_usage(self, tier: TaskTier, spec: ModelSpec, result: LLMResponse):
+        """追踪成本"""
+        self.usage.total_tokens += result.tokens_used
+        self.usage.total_cost_usd += result.cost_usd
+        self.usage.calls_by_tier[tier.value] = self.usage.calls_by_tier.get(tier.value, 0) + 1
+        self.usage.tokens_by_tier[tier.value] = self.usage.tokens_by_tier.get(tier.value, 0) + result.tokens_used
+        self.usage.cost_by_tier[tier.value] = self.usage.cost_by_tier.get(tier.value, 0) + result.cost_usd
 
-                kwargs: dict[str, Any] = {
-                    "model": config["model"],
-                    "messages": messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                }
-
-                if tools:
-                    kwargs["tools"] = [
-                        {
-                            "type": "function",
-                            "function": {
-                                "name": t["name"],
-                                "description": t.get("description", ""),
-                                "parameters": t.get("parameters", {"type": "object", "properties": {}}),
-                            },
-                        }
-                        for t in tools
-                    ]
-                    kwargs["tool_choice"] = "auto"
-
-                response = await client.chat.completions.create(**kwargs)
-                result = self._parse_response(response)
-                return result
-            except Exception as e:
-                logger.error(f"[AgentLLM] Fallback {config['model']} failed: {e}")
-                continue
-
-        # 所有模型都失败了
-        return LLMResponse(
-            content="[系统错误] 所有 LLM 模型均调用失败，请检查 API Key 配置。",
-            model="error",
+        logger.info(
+            f"[LLM] {spec.display_name} | tier={tier.value} | "
+            f"tokens={result.tokens_used} | cost=${result.cost_usd:.4f} | "
+            f"session_total=${self.usage.total_cost_usd:.4f}"
         )
+
+    def _maybe_downgrade_tier(self, tier: TaskTier) -> TaskTier:
+        """如果接近预算上限，自动降级"""
+        ratio = self.usage.total_cost_usd / self.budget_limit if self.budget_limit > 0 else 0
+
+        if ratio >= 0.9:
+            # 超过 90% 预算，所有任务降到最便宜
+            logger.warning(f"[LLM] Budget {ratio*100:.0f}% used, forcing PARSING tier")
+            return TaskTier.PARSING
+        elif ratio >= 0.7:
+            # 超过 70%，CRITICAL 降为 THINKING
+            if tier == TaskTier.CRITICAL:
+                logger.info(f"[LLM] Budget {ratio*100:.0f}% used, downgrading CRITICAL → THINKING")
+                return TaskTier.THINKING
+        return tier
+
+    def get_cost_report(self) -> dict:
+        """获取当前会话的成本报告"""
+        return {
+            "total_tokens": self.usage.total_tokens,
+            "total_cost_usd": round(self.usage.total_cost_usd, 4),
+            "budget_limit_usd": self.budget_limit,
+            "budget_used_pct": round(self.usage.total_cost_usd / self.budget_limit * 100, 1) if self.budget_limit > 0 else 0,
+            "by_tier": {
+                tier: {
+                    "calls": self.usage.calls_by_tier.get(tier, 0),
+                    "tokens": self.usage.tokens_by_tier.get(tier, 0),
+                    "cost_usd": round(self.usage.cost_by_tier.get(tier, 0), 4),
+                }
+                for tier in [t.value for t in TaskTier]
+            },
+        }

@@ -180,16 +180,21 @@ class AgentLoop:
         """
         Coordinator（首席增长官）的思考
         
-        不硬编码流程。让 LLM 根据当前上下文决定下一步。
-        这是"Prompt 即架构"的核心体现。
+        使用 Tier CRITICAL：这是核心决策，质量最重要。
         """
+        from app.agent.engine.llm_adapter import TaskTier
+
         coordinator_prompt = self._build_coordinator_prompt(context)
         
         response = await self.llm.generate(
             system_prompt=coordinator_prompt,
             messages=context.get("messages", []),
+            tier=TaskTier.CRITICAL,  # Coordinator 用最好的模型
             tools=self._get_available_actions(),
         )
+
+        # 同步 token 使用量
+        self.state.total_tokens_used = self.llm.usage.total_tokens
 
         return self._parse_decision(response)
 
@@ -438,14 +443,55 @@ class AgentLoop:
 
     def _parse_decision(self, response) -> AgentAction:
         """解析 LLM 的决策输出为 AgentAction"""
-        # TODO: 实际解析 LLM 的 tool_use 响应
-        # 临时实现
+        from app.agent.engine.llm_adapter import LLMResponse
+
+        if not isinstance(response, LLMResponse):
+            return AgentAction(type=ActionType.OUTPUT, content=str(response))
+
+        # 如果有 tool calls，解析第一个
+        if response.tool_calls:
+            tc = response.tool_calls[0]
+            name = tc.get("name", "")
+            args = tc.get("args", {})
+
+            if name == "think":
+                return AgentAction(
+                    type=ActionType.THINK,
+                    content=args.get("reasoning", ""),
+                )
+            elif name == "call_tool":
+                return AgentAction(
+                    type=ActionType.TOOL_CALL,
+                    content=args.get("reason", "调用工具"),
+                    tool_name=args.get("tool_name"),
+                    tool_args=args.get("tool_args", {}),
+                )
+            elif name == "consult_expert":
+                expert_id = args.get("expert_id", "")
+                return AgentAction(
+                    type=ActionType.EXPERT,
+                    content=args.get("task", f"咨询{expert_id}"),
+                    expert_id=expert_id,
+                )
+            elif name == "ask_user":
+                return AgentAction(
+                    type=ActionType.ASK_USER,
+                    content=args.get("question", ""),
+                )
+            elif name == "output":
+                return AgentAction(
+                    type=ActionType.OUTPUT,
+                    content=args.get("message", ""),
+                )
+
+        # 没有 tool calls，直接用 content 作为输出
+        if response.content:
+            return AgentAction(
+                type=ActionType.OUTPUT,
+                content=response.content,
+            )
+
         return AgentAction(
             type=ActionType.OUTPUT,
-            content=str(response),
+            content="我需要更多信息来帮你制定增长策略。能告诉我你的产品是什么吗？",
         )
-"""
-
-注意：这是骨架代码。_think() 中的 coordinator prompt 是整个系统最重要的部分。
-run() 的 while loop 是心跳。所有复杂性都在工具和专家里，不在循环里。
-"""

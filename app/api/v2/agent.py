@@ -153,3 +153,15 @@ async def list_sessions(
             "last_active_at": loop.state.last_active_at,
         })
     return {"sessions": user_sessions}
+
+
+@router.get("/session/{session_id}/cost")
+async def get_session_cost(
+    session_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    """获取会话的 LLM 成本报告"""
+    loop = _sessions.get(session_id)
+    if not loop:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    return loop.llm.get_cost_report()
