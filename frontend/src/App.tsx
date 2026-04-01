@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react'
 import { Surface } from './pages/Surface'
 import { Chat } from './pages/Chat'
 import { Plan } from './pages/Plan'
+import { Onboarding } from './pages/Onboarding'
+import { Landing } from './pages/Landing'
 import { getToken, setToken, clearToken, setAuthExpiredHandler, api } from './lib/api'
 import { generateCreature } from './components/creature/types'
 import type { CreatureState } from './components/creature/types'
@@ -131,7 +133,10 @@ function AuthPage({ onLogin }: { onLogin: () => void }) {
 
 export default function App() {
   const [authed, setAuthed] = useState(!!getToken())
+  const [showAuth, setShowAuth] = useState(false) // 显示登录还是 Landing
+  const [onboarded, setOnboarded] = useState(!!localStorage.getItem('crabres_onboarded'))
   const [page, setPage] = useState<'surface' | 'chat' | 'plan'>('surface')
+  const [userId, setUserId] = useState('default')
   const [creature, setCreature] = useState<CreatureState>(() =>
     generateCreature('default', 'saas')
   )
@@ -140,26 +145,46 @@ export default function App() {
     setAuthExpiredHandler(() => setAuthed(false))
   }, [])
 
-  // 登录后加载用户数据和生物体
+  // 登录后加载用户数据
   useEffect(() => {
     if (!authed) return
     api<any>('/auth/me').then(user => {
-      const c = generateCreature(
-        String(user.id),
-        'saas' // TODO: 从 onboarding 获取产品类型
-      )
-      c.name = user.company_name || 'My Crab'
-      c.totalUsers = 51    // TODO: 从真实数据
-      c.growthRate = 23     // TODO
-      c.streakDays = 12     // TODO
-      c.mood = 'happy'
-      c.level = 7
-      setCreature(c)
+      setUserId(String(user.id))
+      // 如果已 onboarded，直接加载生物体
+      if (onboarded) {
+        const savedType = localStorage.getItem('crabres_product_type') || 'saas'
+        const c = generateCreature(String(user.id), savedType)
+        c.name = localStorage.getItem('crabres_product_name') || user.company_name || 'My Product'
+        c.mood = 'happy'
+        c.totalUsers = 0
+        c.growthRate = 0
+        c.streakDays = 0
+        setCreature(c)
+      }
     }).catch(() => {})
-  }, [authed])
+  }, [authed, onboarded])
 
   if (!authed) {
-    return <AuthPage onLogin={() => setAuthed(true)} />
+    if (showAuth) {
+      return <AuthPage onLogin={() => { setAuthed(true); setShowAuth(false) }} />
+    }
+    return <Landing onGetStarted={() => setShowAuth(true)} onLogin={() => setShowAuth(true)} />
+  }
+
+  // 未完成 onboarding
+  if (!onboarded) {
+    return (
+      <Onboarding
+        userId={userId}
+        onComplete={(c, productData) => {
+          setCreature(c)
+          localStorage.setItem('crabres_onboarded', '1')
+          localStorage.setItem('crabres_product_type', productData.type || 'saas')
+          localStorage.setItem('crabres_product_name', productData.name || '')
+          setOnboarded(true)
+        }}
+      />
+    )
   }
 
   // TODO: 实现 Chat 和 Plan 页面
