@@ -15,7 +15,8 @@ import asyncio
 import logging
 import time
 import json
-from typing import Any, Optional
+from typing import Any, Optional, AsyncIterator
+from collections.abc import AsyncIterator as AsyncIteratorABC
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -92,7 +93,7 @@ class AgentLoop:
         self._max_consecutive_errors = 3
         self._error_count = 0
 
-    async def run(self, user_message: str) -> AsyncIterator[dict]:
+    async def run(self, user_message: str):
         """
         处理一条用户消息，yield 流式输出
         
