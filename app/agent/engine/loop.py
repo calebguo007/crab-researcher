@@ -103,6 +103,9 @@ class AgentLoop:
         # 写前日志（学 Claude Code）
         await self._write_ahead_log(user_message)
 
+        # 自动提取和存储产品信息（如果用户消息包含产品描述）
+        await self._maybe_save_product_info(user_message)
+
         # 加载记忆上下文
         context = await self._build_context(user_message)
 
@@ -396,18 +399,41 @@ class AgentLoop:
     async def _try_recover(self, context: dict, error: Exception) -> dict:
         """3 级恢复（学 Claude Code）"""
         if self._error_count == 1:
-            # Level 1: 压缩上下文
             logger.info("Recovery L1: compacting context")
             context = self._compact_context(context)
         elif self._error_count == 2:
-            # Level 2: 折叠历史
             logger.info("Recovery L2: collapsing history")
             context = self._collapse_history(context)
         else:
-            # Level 3: 重置到安全状态
             logger.info("Recovery L3: resetting to safe state")
             context = await self._build_context("")
         return context
+
+    async def _maybe_save_product_info(self, user_message: str):
+        """
+        如果用户消息包含产品信息，自动提取存入记忆。
+        这确保后续对话和 Daemon 都能访问产品数据。
+        """
+        msg = user_message.lower()
+        # 简单启发式：第一条消息通常包含产品描述
+        product_keywords = ['my product', 'i built', 'i made', 'i\'m building', 'i have a',
+                          'it\'s a', 'it is a', 'we built', 'our product',
+                          '我的产品', '我做了', '我们做了']
+
+        if any(kw in msg for kw in product_keywords) or self.state.turn_count <= 2:
+            # 存储原始消息作为产品信息
+            existing = await self.memory.load("product") or {}
+            existing["raw_description"] = user_message
+            existing["updated_at"] = time.time()
+
+            # 提取 URL
+            import re
+            urls = re.findall(r'https?://\S+', user_message)
+            if urls:
+                existing["url"] = urls[0]
+
+            await self.memory.save("product", existing)
+            logger.info(f"Product info saved to memory (turn {self.state.turn_count})")
 
     def _compact_context(self, context: dict) -> dict:
         """压缩上下文：截断旧的工具结果"""
