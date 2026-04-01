@@ -10,6 +10,7 @@ import { Chat } from './pages/Chat'
 import { Plan } from './pages/Plan'
 import { Onboarding } from './pages/Onboarding'
 import { Landing } from './pages/Landing'
+import { Settings } from './pages/Settings'
 import { getToken, setToken, clearToken, setAuthExpiredHandler, api } from './lib/api'
 import { generateCreature } from './components/creature/types'
 import type { CreatureState } from './components/creature/types'
@@ -135,7 +136,7 @@ export default function App() {
   const [authed, setAuthed] = useState(!!getToken())
   const [showAuth, setShowAuth] = useState(false) // 显示登录还是 Landing
   const [onboarded, setOnboarded] = useState(!!localStorage.getItem('crabres_onboarded'))
-  const [page, setPage] = useState<'surface' | 'chat' | 'plan'>('surface')
+  const [page, setPage] = useState<'surface' | 'chat' | 'plan' | 'settings'>('surface')
   const [userId, setUserId] = useState('default')
   const [creature, setCreature] = useState<CreatureState>(() =>
     generateCreature('default', 'saas')
@@ -143,6 +144,11 @@ export default function App() {
 
   useEffect(() => {
     setAuthExpiredHandler(() => setAuthed(false))
+    // 初始化暗色模式
+    const savedTheme = localStorage.getItem('crabres_theme')
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark')
+    }
   }, [])
 
   // 登录后加载用户数据
@@ -196,11 +202,16 @@ export default function App() {
     return <Plan creature={creature} onBack={() => setPage('surface')} />
   }
 
+  if (page === 'settings') {
+    return <Settings creature={creature} onBack={() => setPage('surface')} onLogout={() => { setAuthed(false); setOnboarded(false) }} />
+  }
+
   return (
     <Surface
       creature={creature}
       onChat={() => setPage('chat')}
       onPlan={() => setPage('plan')}
+      onSettings={() => setPage('settings')}
     />
   )
 }

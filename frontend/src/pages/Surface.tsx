@@ -14,9 +14,10 @@ interface SurfaceProps {
   creature: CreatureState
   onChat: () => void
   onPlan: () => void
+  onSettings?: () => void
 }
 
-export function Surface({ creature, onChat, onPlan }: SurfaceProps) {
+export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) {
   const greeting = getGreeting(creature)
   const [discoveries, setDiscoveries] = useState<any[]>([])
 
@@ -36,7 +37,7 @@ export function Surface({ creature, onChat, onPlan }: SurfaceProps) {
   }, [])
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center px-4 py-8 max-w-lg mx-auto">
+    <div className="min-h-screen bg-surface bg-grid bg-noise flex flex-col items-center px-4 py-8 max-w-lg mx-auto relative z-10">
       {/* 顶部栏 */}
       <div className="w-full flex items-center justify-between mb-8">
         <div className="flex items-center gap-2">
@@ -46,8 +47,8 @@ export function Surface({ creature, onChat, onPlan }: SurfaceProps) {
           <button className="p-2 rounded-xl hover:bg-hover transition-colors">
             <BellIcon />
           </button>
-          <button className="p-2 rounded-xl hover:bg-hover transition-colors">
-            <SettingsIcon />
+        <button onClick={onSettings} className="p-2 rounded-xl hover:bg-hover transition-colors">
+          <SettingsIcon />
           </button>
         </div>
       </div>
