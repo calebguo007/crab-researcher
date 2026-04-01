@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     API_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
+    # ========== OAuth ==========
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GITHUB_CLIENT_ID: Optional[str] = None
+    GITHUB_CLIENT_SECRET: Optional[str] = None
+
     # ========== 成本控制 ==========
     MONTHLY_BUDGET_PER_USER: float = 100.0
     TOKEN_USAGE_ALERT_THRESHOLD: float = 0.8
