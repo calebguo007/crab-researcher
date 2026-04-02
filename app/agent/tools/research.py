@@ -5,7 +5,7 @@ Tavily 为主力搜索（专为 AI Agent 设计），httpx 做网页抓取。
 """
 
 import logging
-from typing import Any
+from typing import Any, Optional
 import httpx
 from app.core.config import get_settings
 from . import BaseTool, ToolDefinition
@@ -38,7 +38,7 @@ class WebSearchTool(BaseTool):
             concurrent_safe=True,
         )
 
-    async def execute(self, query: str, num_results: int = 5, search_depth: str = "basic", include_domains: list[str] | None = None) -> Any:
+    async def execute(self, query: str, num_results: int = 5, search_depth: str = "basic", include_domains: Optional[list] = None) -> Any:
         if not settings.TAVILY_API_KEY or settings.TAVILY_API_KEY.startswith('填'):
             # Fallback: 没有 Tavily key 时用简单 httpx 搜索
             return await self._fallback_search(query)
@@ -167,7 +167,7 @@ class SocialSearchTool(BaseTool):
             concurrent_safe=True,
         )
 
-    async def execute(self, query: str, platforms: list[str] | None = None) -> Any:
+    async def execute(self, query: str, platforms: Optional[list] = None) -> Any:
         platforms = platforms or ["reddit", "hackernews"]
 
         domain_map = {
@@ -319,7 +319,7 @@ class DeepScrapeTool(BaseTool):
             result_budget=30_000,
         )
 
-    async def execute(self, url: str, formats: list[str] | None = None) -> Any:
+    async def execute(self, url: str, formats: Optional[list] = None) -> Any:
         if not settings.FIRECRAWL_API_KEY or settings.FIRECRAWL_API_KEY.startswith('填'):
             # 降级到普通 scrape
             scraper = ScrapeWebsiteTool()

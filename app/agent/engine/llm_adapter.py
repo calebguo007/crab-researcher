@@ -203,9 +203,9 @@ class AgentLLM:
         system_prompt: str,
         messages: list[dict],
         tier: TaskTier = TaskTier.THINKING,
-        tools: list[dict] | None = None,
+        tools: Optional[list] = None,
         temperature: float = 0.7,
-        max_tokens: int | None = None,
+        max_tokens: Optional[int] = None,
     ) -> LLMResponse:
         """
         生成响应，自动按 Tier 选模型
@@ -252,7 +252,7 @@ class AgentLLM:
         spec: ModelSpec,
         system_prompt: str,
         messages: list[dict],
-        tools: list[dict] | None,
+        tools: Optional[list],
         temperature: float,
         max_tokens: int,
     ) -> LLMResponse:

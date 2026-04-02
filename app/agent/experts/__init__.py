@@ -100,7 +100,7 @@ class ExpertPool:
             expert._llm = self._llm
         self._experts[expert.expert_id] = expert
 
-    def get(self, expert_id: str) -> BaseExpert | None:
+    def get(self, expert_id: str) -> Optional[BaseExpert]:
         return self._experts.get(expert_id)
 
     def list_all(self) -> list[dict]:
