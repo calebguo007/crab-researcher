@@ -90,6 +90,13 @@ class AgentLoop:
         self._max_loop_iterations = 15
         self._message_history: list[dict] = []
 
+        # Agent workspace 沙箱 — Agent 的"工作区"
+        from pathlib import Path
+        workspace_base = Path(str(memory.base_dir)).parent / "workspace"
+        for subdir in ["drafts", "assets", "outreach", "reports", "experiments"]:
+            (workspace_base / subdir).mkdir(parents=True, exist_ok=True)
+        self.workspace = workspace_base
+
         # Trust Levels — 渐进自主权
         from app.agent.trust import TrustManager
         self.trust = TrustManager(memory)
@@ -404,6 +411,16 @@ If this is the user's first message about their product:
    If you can't find anything uncomfortable, you haven't researched deeply enough.
 
 4. **SPECIFICITY TEST**: Before outputting, ask yourself: "Could I swap this product's name with any other product and the advice would still make sense?" If yes → too generic → rewrite with specifics.
+
+5. **PLAYBOOK FORMAT**: When presenting a growth strategy, structure it as executable Playbooks:
+   - Each growth path = 1 Playbook (e.g., "小红书达人种草", "Reddit Community Growth", "X Build in Public")
+   - Each Playbook has Phases (准备期 → 执行期 → 追踪期)
+   - Each Phase has numbered Steps with: title, specific actions, tools to use, budget, timeline, success criteria
+   - Present 2-3 Playbooks ranked by priority
+   - Let the user choose which to activate first
+   - This is NOT a suggestion list. This is an execution manual.
+
+6. **CHANNEL DEPTH**: For X/Twitter, 小红书, and Reddit — give Playbook-level SOPs with platform-specific knowledge (algorithm rules, content formats, timing, anti-ban). For other channels — give directional advice + "whether it fits" judgment + first step.
 
 The user came here because they're tired of generic advice. Show them what real research looks like."""
 

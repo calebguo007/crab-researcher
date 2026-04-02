@@ -225,32 +225,233 @@ CTA 公式: [动词] + [得到什么] + [限定词]
 
     "social_media": [
         {
-            "name": "reddit_marketing",
-            "source": "superamped + ReplyAgent research",
-            "description": "Reddit 深度营销策略",
-            "framework": """核心规则:
-- Reddit 用户反感任何营销味
-- 先提供价值 100 次，再提 1 次产品
-- 帖子格式: 经验分享 > 教程 > 案例 > AMA
-- 回复比发帖更有效
-- 用子版块的语气和术语
+            "name": "x_twitter_deep_knowledge",
+            "source": "CrabRes 2026 platform research + indie hacker community data",
+            "description": "X/Twitter 平台深度运营知识（算法+内容+冷启动+追踪）",
+            "framework": """=== X (TWITTER) PLATFORM DEEP KNOWLEDGE ===
 
-高价值机会发现（学 ReplyAgent）:
-1. 搜索 Google 排名高的 Reddit 帖子（这些帖子长期有流量）
-2. 寻找用户直接表达痛点的帖子（"有人推荐一个好用的 X 吗？"）
-3. 监控新帖子——前 2 小时回复效果最好
-4. 用 social_search 工具搜 "site:reddit.com [关键词]"
+## Algorithm & Recommendation Logic (2026)
+- For You feed ranking: engagement velocity (first 30 min) > total engagement > recency
+- Engagement weight: Reply > Retweet > Like > Bookmark (replies are 10x more valuable than likes)
+- Thread > Single tweet (algorithm treats threads as high-quality content)
+- Image/video tweets get 2-3x more impressions than text-only
+- External links are DEPRIORITIZED — put links in reply, not main tweet
+- New accounts have a 14-day "probation" — algorithm observes behavior before boosting
+- Tweeting 1-3x/day optimal. >5/day hurts unless you're already big
 
-3 种安全的获客方式:
-1. 帮人解决问题时顺带提及（最有效）
-2. 做"免费资源"帖子附产品链接
-3. 在个人主页 bio 放链接
+## Cold Start Strategy (0 → 1000 followers)
+Week 1-2: Reply guy strategy
+  - Find 10 large accounts in your niche (10K-100K followers)
+  - Reply to their tweets within 30 min of posting (early replies get shown)
+  - Reply must ADD VALUE (insight, data, personal experience) — not "great point!"
+  - Goal: 20-30 quality replies/day → their followers notice you
+  
+Week 3-4: Original content
+  - 1 Thread per week (5-12 tweets, educational/story format)
+  - 1-2 single tweets per day (insight, hot take, or build-in-public update)
+  - Thread structure: Hook (tweet 1) → Value points → CTA (last tweet)
+  
+Month 2+: Build in Public
+  - Share real numbers (revenue, users, failures)
+  - Be vulnerable — "I launched and got 0 users" gets more engagement than fake success
+  - Post at 8-10am EST (when US indie hackers are starting their day)
 
-高级策略（学 OptaReach）:
-- 识别高意图帖子（有人在主动寻找解决方案）
-- 不要回复冷帖（低评论低赞的老帖不值得）
-- 回复要有实质价值（至少 3-5 行有用内容，最后一行提产品）
-- 用不同角度回复同一个需求（一次经验分享，一次工具推荐，一次数据支撑）""",
+## Content Formats That Work
+1. **Thread Hook Formulas:**
+   - "I studied [X] for [time]. Here's what I learned:"
+   - "Most people think [common belief]. They're wrong. Here's why:"
+   - "[Achievement]. Here's the exact playbook (stolen from [authority]):"
+   - "I made $[X] with [product]. Here are the [N] things that actually worked:"
+
+2. **Single Tweet Formulas:**
+   - Hot take + one-line evidence
+   - Before/After with specific numbers
+   - "Stop doing X. Start doing Y. Here's why:" (contrarian)
+   - Screenshot of real data + 1-sentence commentary
+
+3. **What to NEVER do:**
+   - Don't tweet links in main tweet (put in reply)
+   - Don't use >2 hashtags (looks spammy on X)
+   - Don't engage with engagement pods (algorithm detects and penalizes)
+   - Don't buy followers (engagement rate tanks, algorithm deprioritizes)
+
+## Key Metrics (what actually matters)
+- Profile visits (people checking you out) > Impressions (vanity)
+- Link clicks (actual traffic) > Likes (feel-good)
+- Follower-to-profile-visit ratio (>10% = good positioning)
+- Thread completion rate (how many read to the end)
+
+## X → Paying Customer Funnel
+Bio link → Landing page with clear CTA → Email capture or signup
+- Bio should be: [What you do] + [Who it's for] + [Social proof] + [Link]
+- Pinned tweet = your best thread or product announcement
+- Never link to homepage — link to a specific landing page with UTM""",
+        },
+        {
+            "name": "xiaohongshu_deep_knowledge",
+            "source": "CrabRes 2026 + 小红书运营专家访谈 + 蝉妈妈数据研究",
+            "description": "小红书平台深度运营知识（算法+内容+种草+达人合作）",
+            "framework": """=== 小红书 (XIAOHONGSHU/RED NOTE) PLATFORM DEEP KNOWLEDGE ===
+
+## Algorithm & Distribution Logic (2026)
+- CES 评分系统（Content Engagement Score）:
+  点赞 1 分 / 收藏 1 分 / 评论 4 分 / 转发 4 分
+  → 评论和转发权重是点赞的 4 倍！内容要引发讨论，不只是"好看"
+
+- 流量池递进机制:
+  发布 → 200-500 曝光（初始池）
+  → 2 小时内 CES 达标 → 进入 1000-5000 池
+  → 继续达标 → 1 万 → 10 万 → 100 万
+  **发布后 2 小时是黄金期**——这段时间的互动决定生死
+
+- 发布最佳时间:
+  工作日: 7:00-8:00 / 12:00-13:00 / 18:00-20:00 / 21:00-23:00
+  周末: 10:00-12:00 / 15:00-17:00 / 20:00-23:00
+  避开: 凌晨发帖（没有初始互动，直接死）
+
+- 限流行为（绝对避免）:
+  ❌ 笔记中出现微信号/二维码/淘宝链接
+  ❌ 频繁修改已发布笔记（每次修改重新进入审核）
+  ❌ 搬运/重复内容
+  ❌ 明显硬广不挂报备标识
+  ❌ 一天发超过 2 篇（新号最多 1 篇/天）
+  ❌ 评论区导流（"私信我""看主页"）
+
+## Content Creation Deep Guide
+
+### 封面设计（决定点击率的 70%）
+- **必须手机竖屏 3:4 比例**（1080×1440 或等比）
+- 大字报风格最稳: 3-5 个大字 + 辅助小字 + 简洁背景
+- 颜色: 高饱和度 > 低饱和度（在 feed 中更醒目）
+- 人脸出镜笔记点击率比纯产品图高 30-50%
+- 对比图效果好（Before/After, 我的 vs 竞品）
+- **绝不用左右分栏对比结构**（太模板化，没辨识度）
+
+### 标题套路（字符限制 20 字内）
+- 数字 + 痛点: "3 步搞定 XX 问题"
+- 身份标签: "设计师私藏的 XX"
+- 情绪词: "绝了/天花板/封神/后悔没早买"
+- 反问: "为什么没人告诉我 XX 这么好用？"
+- 悬念: "用了 XX 之后，再也回不去了"
+
+### 正文结构（1000 字以内）
+1. 痛点引入（第一行抓人，不废话）
+2. 解决方案 / 使用体验
+3. 具体步骤 / 对比数据
+4. 总结推荐 + 互动引导（"你们觉得呢？"）
+- 多分段（每段 2-3 行）
+- 适度用 emoji 分隔（但不过度）
+- 关键词自然分布在标题+正文+标签中
+
+### 关键词布局
+- 标题必须包含核心关键词
+- 正文前 100 字包含 1-2 次关键词
+- 标签 5-10 个: 2 个大词(>1000万笔记) + 3 个中词(10-1000万) + 3 个小词(<10万)
+- 用小红书搜索下拉词找长尾关键词
+
+## 达人合作 SOP
+- 素人铺量（粉丝<1K）: ¥50-200/篇，用于制造"很多人在用"的氛围
+- KOC（1K-1万粉）: ¥200-1000/篇，真实体验感最强
+- 中腰部 KOL（1万-50万粉）: ¥1000-1万/篇，品效合一
+- 头部 KOL（50万+）: >¥1万/篇，适合品牌曝光而非直接转化
+
+选号核心指标:
+1. 互动率 > 2%（点赞+收藏+评论 / 粉丝数）
+2. 近 30 天发布频率 > 4 篇（活跃度）
+3. 粉丝画像与目标用户重合度 > 50%
+4. 近期无负面/争议（避免"塌房"博主）
+5. 广告笔记占比 < 30%（过多广告=粉丝信任度低）
+
+## 变现路径
+- 笔记 → 评论区/主页引导 → 私域（微信）→ 成交
+- 笔记 → 小红书店铺 → 直接成交
+- 笔记 → 品牌搜索 → 淘宝/京东成交（种草→搜索的经典路径）""",
+        },
+        {
+            "name": "reddit_deep_knowledge",
+            "source": "CrabRes 2026 + ReplyAgent/OptaReach research + Reddit mod AMA analysis",
+            "description": "Reddit 平台深度运营知识（文化+算法+子版块+反封号）",
+            "framework": """=== REDDIT PLATFORM DEEP KNOWLEDGE ===
+
+## Platform Culture (CRITICAL — violate this and you're dead)
+- Reddit is ANTI-MARKETING. Users actively hunt and downvote promotional content.
+- Each subreddit is its own country with its own laws (rules, mods, culture).
+- Karma = credibility. Low karma account posting about a product = instant suspicion.
+- Mods have absolute power. If a mod doesn't like your post, you're banned. No appeal.
+- "10% rule": most subreddits expect <10% of your posts/comments to be self-promotional.
+- Authenticity is currency. "I built this" posts work. "Check out this amazing tool" posts die.
+
+## Algorithm & Ranking
+- Hot algorithm: score = upvotes - downvotes, weighted by recency (newer posts ranked higher)
+- First 10 upvotes matter as much as next 100 (logarithmic decay)
+- First 1-2 hours are critical — early downvotes can kill a post permanently
+- Comments also ranked: early comments with upvotes get "locked" at top
+- Google indexes Reddit heavily — top posts rank for years (long-tail traffic)
+- Reddit posts in Google results get steady traffic for 6-24 months
+
+## Cold Start Strategy (new account)
+Day 1-7: Pure lurking and genuine commenting
+  - Subscribe to 10+ subreddits in your niche
+  - Comment helpfully on 5-10 posts per day (genuine advice, not generic)
+  - ZERO mention of any product
+  - Goal: reach 100+ karma
+
+Day 8-14: Value-first posting
+  - Post 1-2 valuable posts (tutorial, experience share, data analysis)
+  - Still no product mentions
+  - Engage deeply with every comment on your posts
+
+Day 15+: Natural integration
+  - When someone asks for help with a problem your product solves:
+    → Write 3-5 sentences of genuine help FIRST
+    → Then: "I actually built a tool for this: [link]. Happy to give you free access."
+  - Post "Show HN" or "I built this" style posts in appropriate subreddits (r/SideProject, r/startups)
+
+## Subreddit Research Method
+For each target subreddit, research:
+1. Subscriber count and daily post volume
+2. Rules (especially about self-promotion) — read the FULL sidebar
+3. Top 10 posts of all time → what format/tone works
+4. Top 10 posts this month → what's currently trending
+5. Mod behavior → how strict, what gets removed
+6. Competitor presence → are competitors posting? How are they received?
+7. Best posting time → check top posts' timestamps
+
+## Content Formats Ranked by Effectiveness
+1. **"I did X. Here's what happened." (experience share)**
+   → Highest trust, people love real data and real stories
+2. **"Guide: How to do X" (tutorial)**
+   → Gets bookmarked, long shelf life in Google
+3. **"I analyzed X for Y days" (data/research)**
+   → Gets upvoted for effort, often goes viral
+4. **"AMA about X" (ask me anything)**
+   → Works well if you have genuine expertise
+5. **"I built X" (show & tell)**
+   → Works in r/SideProject, r/startups — be transparent about being the creator
+
+## Reply Strategy (often more effective than posting)
+- Find posts ranked on Google for keywords related to your product
+  → These get steady traffic for months
+  → A helpful reply with your product link = passive leads forever
+- Reply within 2 hours of a new post (early replies get top position)
+- Reply length: 3-5 sentences of genuine help + 1 sentence product mention
+- Never reply to your own post from alt accounts (Reddit detects this)
+
+## Anti-Ban Survival Guide
+- Never use the same account for multiple products
+- Never post the same link to multiple subreddits simultaneously
+- Space out self-promotional posts by at least 7 days
+- If a post gets removed, DON'T repost — message the mods and ask why
+- Vary your content format and writing style between posts
+- Use Reddit's native image/video hosting when possible (algorithm prefers it)
+- Old account with history >> New account (buy/build karma first)
+
+## Key Metrics
+- Upvote ratio (>90% = well-received, <60% = controversial/promotional)
+- Comment count per post (engagement depth)
+- Profile visits after posting (check in Reddit analytics)
+- UTM link clicks (actual traffic driven)
+- Google ranking of your posts (long-term value)""",
         },
     ],
 
