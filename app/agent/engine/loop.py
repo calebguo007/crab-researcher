@@ -380,6 +380,8 @@ Turn: {self.state.turn_count}
 - competitor_analyze: Deep parallel analysis (scrape + search + social)
 - deep_scrape: JS-rendered pages (Instagram, SPAs, anti-bot sites)
 
+{self._get_playbook_context()}
+
 ## CRITICAL RULE
 
 If this is the user's first message about their product:
@@ -794,6 +796,37 @@ Synthesize the expert findings into ONE clear, actionable response for the user.
                     content_preview=user_message[:200],
                 )
                 logger.info(f"Auto-tracked posted URL: {platform}/{action_type} → {url_lower[:60]}")
+
+    def _get_playbook_context(self) -> str:
+        """获取 Playbook 模板和活跃 Playbook 状态，注入 Coordinator prompt"""
+        parts = []
+        try:
+            from app.agent.knowledge.playbook_templates import get_playbook_templates_prompt
+            parts.append(get_playbook_templates_prompt())
+        except Exception:
+            pass
+
+        try:
+            from app.agent.memory.playbooks import PlaybookStore
+            import asyncio
+            store = PlaybookStore(base_dir=str(self.memory.base_dir))
+            # 同步调用（在 prompt 构建时无法 await）
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # 在已运行的 event loop 中，使用线程安全方式
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    summary = pool.submit(
+                        lambda: asyncio.run(store.get_active_playbook_summary())
+                    ).result(timeout=2)
+            else:
+                summary = asyncio.run(store.get_active_playbook_summary())
+            if summary:
+                parts.append(summary)
+        except Exception:
+            pass
+
+        return "\n".join(parts) if parts else ""
 
     def _compact_context(self, context: dict) -> dict:
         """压缩上下文：截断旧的工具结果"""
