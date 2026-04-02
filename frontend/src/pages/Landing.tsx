@@ -26,29 +26,48 @@ export function Landing({ onGetStarted, onLogin, onCompare }: LandingProps) {
 
   // 交互式 Demo 状态
   const [demoInput, setDemoInput] = useState('')
-  const [demoState, setDemoState] = useState<'idle' | 'searching' | 'done'>('idle')
-  const [demoResults, setDemoResults] = useState<string[]>([])
+  const [demoState, setDemoState] = useState<'idle' | 'searching' | 'done' | 'error'>('idle')
+  const [demoPhase, setDemoPhase] = useState('')
+  const [demoData, setDemoData] = useState<any>(null)
 
-  const runDemo = () => {
+  const runDemo = async () => {
     if (!demoInput.trim()) return
     setDemoState('searching')
-    setDemoResults([])
+    setDemoData(null)
 
-    // 模拟搜索过程（逐步显示）
-    const steps = [
-      `🔍 Searching competitors for "${demoInput.trim().slice(0, 30)}"...`,
-      `📊 Found 4 competitors with real pricing data`,
-      `💬 Scanning Reddit for user discussions...`,
-      `🧠 13 experts analyzing your market...`,
-      `✅ Growth plan ready — sign up to see the full strategy`,
-    ]
+    // 渐进式展示搜索阶段（真实 API 在后台跑）
+    setDemoPhase(`Searching competitors for "${demoInput.trim().slice(0, 30)}"...`)
+    const phaseTimer1 = setTimeout(() => setDemoPhase('Scanning Reddit & Hacker News for user discussions...'), 3000)
+    const phaseTimer2 = setTimeout(() => setDemoPhase('Analyzing market data...'), 6000)
+    const phaseTimer3 = setTimeout(() => setDemoPhase('Generating insights...'), 9000)
 
-    steps.forEach((step, i) => {
-      setTimeout(() => {
-        setDemoResults(prev => [...prev, step])
-        if (i === steps.length - 1) setDemoState('done')
-      }, (i + 1) * 800)
-    })
+    try {
+      const API = (import.meta as any).env?.VITE_API_BASE || '/api'
+      const res = await fetch(`${API}/demo/quick-scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ product_description: demoInput.trim() }),
+      })
+
+      clearTimeout(phaseTimer1)
+      clearTimeout(phaseTimer2)
+      clearTimeout(phaseTimer3)
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || `Error ${res.status}`)
+      }
+
+      const data = await res.json()
+      setDemoData(data)
+      setDemoState('done')
+    } catch (e: any) {
+      clearTimeout(phaseTimer1)
+      clearTimeout(phaseTimer2)
+      clearTimeout(phaseTimer3)
+      console.error('Demo scan failed:', e)
+      setDemoState('error')
+    }
   }
 
   return (
@@ -100,30 +119,100 @@ export function Landing({ onGetStarted, onLogin, onCompare }: LandingProps) {
                 onClick={demoInput.trim() ? runDemo : onGetStarted}
                 className="btn-primary !py-3 !px-6 !rounded-xl shadow-lg !text-base whitespace-nowrap"
               >
-                {demoInput.trim() ? 'Try it →' : 'Start free →'}
+                {demoInput.trim() ? 'Scan market →' : 'Start free →'}
               </button>
             </div>
-          ) : (
-            <div className="card p-4 text-left space-y-2">
-              {demoResults.map((r, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm animate-fade-in"
-                  style={{ animationDelay: `${i * 0.1}s`, animationFillMode: 'forwards', opacity: 0 }}>
-                  <span>{r}</span>
-                </div>
-              ))}
-              {demoState === 'done' && (
-                <button onClick={onGetStarted}
-                  className="btn-primary w-full !py-3 !rounded-xl mt-3 animate-fade-in"
-                  style={{ animationDelay: '0.5s', animationFillMode: 'forwards', opacity: 0 }}>
-                  See your full growth plan — free →
-                </button>
-              )}
+          ) : demoState === 'searching' ? (
+            <div className="card p-5 text-left">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-2 h-2 rounded-full bg-brand animate-ping" />
+                <span className="text-sm font-heading font-medium text-primary">Scanning real market data...</span>
+              </div>
+              <p className="text-xs text-muted animate-pulse">{demoPhase}</p>
+              <div className="mt-3 h-1.5 rounded-full bg-border overflow-hidden">
+                <div className="h-full bg-brand/60 rounded-full animate-[expand_12s_ease-in-out_forwards]" 
+                  style={{ width: '0%', animation: 'expand 12s ease-in-out forwards' }} />
+              </div>
+              <style>{`@keyframes expand { 0% { width: 5%; } 50% { width: 60%; } 80% { width: 85%; } 100% { width: 95%; } }`}</style>
             </div>
-          )}
+          ) : demoState === 'error' ? (
+            <div className="card p-5 text-left">
+              <p className="text-sm text-secondary mb-3">Couldn't reach the research engine right now. Try the full experience instead:</p>
+              <button onClick={onGetStarted} className="btn-primary w-full !py-3 !rounded-xl">
+                Start free — full research inside →
+              </button>
+            </div>
+          ) : demoData ? (
+            <div className="card p-0 text-left overflow-hidden">
+              {/* 竞品发现 */}
+              {demoData.competitors?.length > 0 && (
+                <div className="p-4 border-b border-border">
+                  <p className="text-[10px] font-heading font-bold text-brand uppercase tracking-wider mb-2">
+                    {demoData.competitors.length} Competitors Found
+                  </p>
+                  <div className="space-y-2">
+                    {demoData.competitors.slice(0, 3).map((c: any, i: number) => (
+                      <div key={i} className="flex items-start gap-2 animate-fade-in" style={{ animationDelay: `${i * 0.1}s`, animationFillMode: 'forwards', opacity: 0 }}>
+                        <span className="text-brand text-xs mt-0.5">●</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-primary truncate">{c.name}</p>
+                          <p className="text-xs text-muted truncate">{c.snippet}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 社媒讨论 */}
+              {demoData.social_mentions?.length > 0 && (
+                <div className="p-4 border-b border-border">
+                  <p className="text-[10px] font-heading font-bold text-muted uppercase tracking-wider mb-2">
+                    {demoData.social_mentions.length} Community Discussions
+                  </p>
+                  <div className="space-y-1.5">
+                    {demoData.social_mentions.slice(0, 2).map((s: any, i: number) => (
+                      <div key={i} className="flex items-center gap-2 text-xs animate-fade-in" style={{ animationDelay: `${0.3 + i * 0.1}s`, animationFillMode: 'forwards', opacity: 0 }}>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-hover font-mono uppercase">{s.platform}</span>
+                        <span className="text-secondary truncate">{s.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 关键洞察 + 刺痛真话 */}
+              <div className="p-4 space-y-2">
+                {demoData.key_insight && (
+                  <div className="flex gap-2 animate-fade-in" style={{ animationDelay: '0.5s', animationFillMode: 'forwards', opacity: 0 }}>
+                    <span className="text-brand shrink-0">💡</span>
+                    <p className="text-sm text-primary font-medium leading-relaxed">{demoData.key_insight}</p>
+                  </div>
+                )}
+                {demoData.uncomfortable_truth && (
+                  <div className="flex gap-2 animate-fade-in" style={{ animationDelay: '0.7s', animationFillMode: 'forwards', opacity: 0 }}>
+                    <span className="text-accent shrink-0">⚠️</span>
+                    <p className="text-sm text-secondary leading-relaxed">{demoData.uncomfortable_truth}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* CTA */}
+              <div className="p-4 bg-brand/5 border-t border-brand/10 animate-fade-in" style={{ animationDelay: '0.9s', animationFillMode: 'forwards', opacity: 0 }}>
+                <button onClick={onGetStarted}
+                  className="btn-primary w-full !py-3 !rounded-xl">
+                  See full strategy from 13 experts — free →
+                </button>
+                <p className="text-[10px] text-muted text-center mt-2">This was a 15-second scan. Full analysis takes 2 minutes.</p>
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <p className="text-xs text-muted">
-          {demoState === 'idle' ? 'Free to start · No credit card required' : 'Real research, not templates'}
+          {demoState === 'idle' ? 'Free to start · No credit card required' 
+            : demoState === 'done' ? 'Real data from live internet search — not templates' 
+            : ''}
         </p>
       </section>
 

@@ -38,10 +38,27 @@ class BaseExpert(ABC):
         # 获取该专家的专业知识库
         knowledge = get_expert_knowledge(self.expert_id)
 
-        # 构建增强版 system prompt = 专家基础 prompt + 专业知识
+        # 构建增强版 system prompt = 专家基础 prompt + 专业知识 + 输出质量规则
         enhanced_prompt = self.system_prompt
         if knowledge:
             enhanced_prompt += "\n" + knowledge
+
+        # 所有专家共享的输出质量规则
+        enhanced_prompt += """
+
+## OUTPUT QUALITY RULES (MANDATORY)
+
+1. **SPECIFIC DATA POINTS**: Every claim must include at least one specific number, name, or link.
+   BAD: "There are several competitors in this space"
+   GOOD: "Top 3 competitors: Teal (4.8M visits/mo), Jobscan (2.1M), Kickresume (890K)"
+
+2. **NO CONSULTANT SPEAK**: Banned phrases: "consider", "might want to", "could potentially", "it's important to", "there are opportunities". 
+   Instead: direct imperatives with specifics. "Post in r/cscareerquestions (1.2M members) every Tuesday 9am EST."
+
+3. **CITE YOUR REASONING**: Don't just state conclusions. Show the logic chain:
+   "Reddit r/resumes has 850K members → 42% of Teal's traffic comes from Reddit → your first priority should be r/resumes because [specific reason]."
+
+4. **ONE CONTRARIAN TAKE**: Include one thing that goes against conventional wisdom or challenges the other experts' views. You are not here to agree — you are here to sharpen the strategy through debate."""
 
         # 构建任务消息
         product_info = context.get("product", {})

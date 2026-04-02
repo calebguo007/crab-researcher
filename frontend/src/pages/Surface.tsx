@@ -17,46 +17,11 @@ interface SurfaceProps {
   onSettings?: () => void
 }
 
-/**
- * 精准计算 X (Twitter) 字符长度
- * 规则：
- * 1. 基础 ASCII 字符 (0-127): 1 字符
- * 2. 非 ASCII (中文, Emojis, 扩展拉丁等): 2 字符
- * 3. 链接 (http/https): 无论长短统一算 23 字符
- */
-function calculateTwitterLength(text: string): number {
-  if (!text) return 0
-  
-  let length = 0
-  // 1. 处理链接
-  const urlRegex = /https?:\/\/[^\s]+/g
-  const textWithoutUrls = text.replace(urlRegex, () => {
-    length += 23
-    return ""
-  })
-
-  // 2. 处理剩余字符
-  for (const char of textWithoutUrls) {
-    // 使用 codePointAt 处理 4 字节 Emoji (如 🦀)
-    const codePoint = char.codePointAt(0) || 0
-    if (codePoint <= 127) {
-      length += 1
-    } else {
-      length += 2
-    }
-  }
-  
-  // 考虑到回车符在某些环境下可能被算作 2 字符 (CRLF)，我们强制按 1 字符计，但保留余量
-  return length
-}
-
 export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) {
   const greeting = getGreeting(creature)
   const [discoveries, setDiscoveries] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
-  const [hunterBullets, setHunterBullets] = useState<Record<number, string>>({})
-  const [hunterLoading, setHunterLoading] = useState<Record<number, boolean>>({})
 
   // 加载真实数据
   useEffect(() => {
@@ -76,26 +41,6 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
     const interval = setInterval(load, 60_000)
     return () => clearInterval(interval)
   }, [])
-
-  const generateBullet = async (index: number) => {
-    setHunterLoading(prev => ({ ...prev, [index]: true }))
-    try {
-      const res = await api<any[]>('/agent/chat', {
-        method: 'POST',
-        body: JSON.stringify({
-          message: `Write a ready-to-publish X/Twitter post (under 280 chars) about my product. Make it punchy, authentic, and growth-focused. Target: indie hackers and founders. Include 2-3 relevant hashtags. Post #${index + 1}.`,
-        }),
-      })
-      const content = res.find((r: any) => r.type === 'message')?.content
-        || res[res.length - 1]?.content
-        || 'Could not generate. Try again.'
-      setHunterBullets(prev => ({ ...prev, [index]: content }))
-    } catch {
-      setHunterBullets(prev => ({ ...prev, [index]: '⚠️ Generation failed. Please try again.' }))
-    } finally {
-      setHunterLoading(prev => ({ ...prev, [index]: false }))
-    }
-  }
 
   return (
     <div className="min-h-screen bg-surface bg-grid bg-noise flex flex-col items-center px-4 py-8 max-w-lg mx-auto relative z-10">
@@ -199,114 +144,6 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         </div>
       </div>
 
-      {/* 增长猎手 (Growth Hunter) - 新模块 */}
-      <div className="w-full mb-8 relative">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-medium text-brand uppercase tracking-widest font-heading flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand"></span>
-            </span>
-            {creature.market === 'global' ? 'Growth Hunter' : '增长猎手'}
-          </h3>
-          <span className="text-[10px] text-muted font-mono uppercase tracking-tighter">Hunter Mode: Active</span>
-        </div>
-        
-        <div className="card bg-brand/5 border-brand/20 p-5 overflow-hidden relative group">
-          {/* 背景雷达装饰 */}
-          <div className="absolute -right-10 -top-10 w-40 h-40 border border-brand/10 rounded-full animate-pulse pointer-events-none"></div>
-          <div className="absolute -right-5 -top-5 w-20 h-20 border border-brand/5 rounded-full pointer-events-none"></div>
-          
-          <div className="relative z-10">
-            <p className="text-sm font-bold text-primary mb-1">
-              {creature.market === 'global' ? 'Ready-to-Post Content' : '即发文案生成器'}
-            </p>
-            <p className="text-xs text-secondary mb-4 opacity-80 leading-relaxed">
-              {creature.market === 'global' 
-                ? 'Generate platform-native posts for your target communities. Edit, then send.' 
-                : '为你的目标社区生成平台原生文案。编辑后一键发送。'}
-            </p>
-            
-            <div className="space-y-3">
-              {[0, 1, 2].map(i => {
-                const bullet = hunterBullets[i]
-                const loading = hunterLoading[i]
-                // 核心：使用精准的 Twitter 长度算法
-                const charCount = calculateTwitterLength(bullet || "")
-                const isOverLimit = charCount > 280
-
-                return (
-                  <div key={i} className="rounded-xl bg-surface border border-border overflow-hidden transition-all hover:border-brand/30">
-                    <div className="flex items-center justify-between p-3 cursor-pointer group/item hover:bg-hover"
-                      onClick={() => !bullet && generateBullet(i)}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center text-brand text-xs font-bold">#0{i+1}</div>
-                        <div>
-                          <div className="text-xs font-bold text-primary">{creature.market === 'global' ? ['Reddit Post', 'X Thread', 'LinkedIn Post'][i] : ['Reddit 帖子', 'X 推文', 'LinkedIn 帖'][i]}</div>
-                          <div className="text-[10px] text-muted">{creature.market === 'global' ? 'Click to generate' : '点击生成'}</div>
-                        </div>
-                      </div>
-                      {!bullet ? (
-                        <button className="text-[10px] font-bold text-brand px-3 py-1.5 rounded-lg border border-brand/20 hover:bg-brand hover:text-white transition-all disabled:opacity-50"
-                          disabled={loading}>
-                          {loading ? (creature.market === 'global' ? 'GENERATING...' : '生成中...') : (creature.market === 'global' ? 'GENERATE BULLET' : '生成子弹')}
-                        </button>
-                      ) : (
-                        <div className={`text-[10px] font-mono font-bold ${isOverLimit ? 'text-red-500 animate-pulse' : 'text-success'}`}>
-                          {charCount}/280
-                        </div>
-                      )}
-                    </div>
-                    
-                    {bullet && (
-                      <div className="px-4 pb-4 animate-fade-in">
-                        <textarea 
-                          value={bullet}
-                          onChange={(e) => setHunterBullets(prev => ({ ...prev, [i]: e.target.value }))}
-                          className={`w-full bg-hover border p-3 rounded-lg text-xs font-mono leading-relaxed transition-colors focus:outline-none ${isOverLimit ? 'border-red-500/50 focus:border-red-500' : 'border-border focus:border-brand/50'}`}
-                          rows={4}
-                        />
-                        <div className="flex justify-between items-center mt-3">
-                           <p className={`text-[9px] italic font-medium ${isOverLimit ? 'text-red-400' : 'text-muted'}`}>
-                             {isOverLimit 
-                               ? (creature.market === 'global' ? '❌ EXCEEDS X LIMIT!' : '❌ 超出 X 平台限制！') 
-                               : (creature.market === 'global' ? '✓ Ready to send' : '✓ 已就绪')}
-                           </p>
-                           <button className="btn-primary !px-4 !py-1.5 !text-[10px] disabled:opacity-50 disabled:bg-gray-700 disabled:cursor-not-allowed" 
-                             disabled={isOverLimit || loading}
-                             onClick={async () => {
-                               try {
-                                 const res = await api<any>('/execute/prepare', {
-                                   method: 'POST',
-                                   body: JSON.stringify({ platform: 'x', content: bullet, action_type: 'post' }),
-                                 })
-                                 if (res.url) {
-                                   navigator.clipboard.writeText(bullet)
-                                   window.open(res.url, '_blank')
-                                 }
-                               } catch {
-                                 navigator.clipboard.writeText(bullet)
-                                 window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(bullet.slice(0, 270))}`, '_blank')
-                               }
-                             }}>
-                             {creature.market === 'global' ? 'SEND NOW' : '立即发送'}
-                           </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            
-            <button className="w-full mt-4 py-2 text-[11px] font-bold text-muted hover:text-brand transition-colors uppercase tracking-widest border-t border-white/5 pt-4"
-              onClick={onPlan}>
-              {creature.market === 'global' ? 'View Hunter Dashboard →' : '进入猎手中心 →'}
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* 发现 */}
       <div className="w-full mb-8" id="discoveries-section">
         <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3">
@@ -360,17 +197,20 @@ function MetricCard({ value, label, accent }: { value: string; label: string; ac
 
 function TaskCard({ icon, title, subtitle, action, onAction }: { icon: React.ReactNode; title: string; subtitle: string; action: string; onAction?: () => void }) {
   return (
-    <div className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border hover:border-brand/30 transition-all group hover:shadow-glow">
-      <div className="w-9 h-9 rounded-xl bg-brand/10 flex items-center justify-center text-brand shrink-0">
-        {icon}
+    <div className="flex items-stretch rounded-2xl bg-card border border-border hover:border-brand/30 transition-all group hover:shadow-glow overflow-hidden">
+      <div className="w-1 bg-brand rounded-l-2xl shrink-0" />
+      <div className="flex items-center gap-3 p-4 flex-1 min-w-0">
+        <div className="w-9 h-9 rounded-xl bg-brand/10 flex items-center justify-center text-brand shrink-0">
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-primary tracking-tight">{title}</p>
+          <p className="text-xs text-muted truncate opacity-70 font-mono tracking-tighter">{subtitle}</p>
+        </div>
+        <button onClick={onAction} className="text-[11px] font-bold text-brand opacity-0 group-hover:opacity-100 transition-all px-3 py-1.5 rounded-lg border border-brand/20 hover:bg-brand hover:text-white">
+          {action} →
+        </button>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-primary tracking-tight">{title}</p>
-        <p className="text-xs text-muted truncate opacity-70 font-mono tracking-tighter">{subtitle}</p>
-      </div>
-      <button onClick={onAction} className="text-[11px] font-bold text-brand opacity-0 group-hover:opacity-100 transition-all px-3 py-1.5 rounded-lg border border-brand/20 hover:bg-brand hover:text-white">
-        {action} →
-      </button>
     </div>
   )
 }

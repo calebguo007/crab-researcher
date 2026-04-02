@@ -37,7 +37,8 @@ class LoopPhase(str, Enum):
 class ActionType(str, Enum):
     THINK = "think"          # 内部推理
     TOOL_CALL = "tool_call"  # 调用工具
-    EXPERT = "expert"        # 调度专家
+    EXPERT = "expert"        # 调度单个专家
+    ROUNDTABLE = "roundtable"  # 圆桌：并行调度多个专家 + Coordinator 综合
     ASK_USER = "ask_user"    # 向用户提问
     OUTPUT = "output"        # 输出给用户
     WAIT = "wait"            # 等待用户输入/外部事件
@@ -51,6 +52,7 @@ class AgentAction:
     tool_name: Optional[str] = None
     tool_args: Optional[dict] = None
     expert_id: Optional[str] = None
+    expert_ids: list[str] = field(default_factory=list)  # 圆桌模式：多个专家 ID
     metadata: dict = field(default_factory=dict)
     parallel_tools: list = field(default_factory=list)  # 并发执行的额外工具
 
@@ -207,6 +209,28 @@ class AgentLoop:
                         "content": expert_output,
                     }
 
+                elif decision.type == ActionType.ROUNDTABLE:
+                    # 圆桌模式：并行调度多个专家 → 收集输出 → Coordinator 综合
+                    expert_ids = decision.expert_ids or []
+                    if not expert_ids:
+                        expert_ids = ["market_researcher", "economist"]
+
+                    yield {"type": "status", "content": f"Assembling roundtable: {len(expert_ids)} experts..."}
+
+                    # 并行调度所有选中的专家
+                    async for event in self._run_roundtable(expert_ids, decision.content, context):
+                        if event.get("type") == "expert_thinking":
+                            # 将专家输出合并到上下文
+                            eid = event.get("expert_id", "")
+                            content_text = event.get("content", "")
+                            self.state.expert_outputs[eid] = content_text
+                            context.setdefault("expert_outputs", {})[eid] = content_text
+                            self._message_history.append({
+                                "role": "assistant",
+                                "content": f"[Expert: {eid}] {content_text[:1500]}",
+                            })
+                        yield event
+
                 elif decision.type == ActionType.THINK:
                     # 内部推理，不输出给用户，但加入历史让 Coordinator 记住
                     context = self._incorporate_thinking(context, decision)
@@ -309,10 +333,18 @@ Step 2: RESEARCH (mandatory — use at least 2 tools before any strategy)
   - Search competitors: web_search
   - Find target users: social_search
   - Analyze competitor sites: competitor_analyze or scrape_website
-Step 3: Consult relevant experts (not all 13 — pick the 3-4 most relevant)
-Step 4: Synthesize into a specific, executable plan
-Step 5: Have the critic review it
-Step 6: Output the final plan with ALL content written
+Step 3: ROUNDTABLE (use consult_roundtable, NOT consult_expert)
+  - Pick 2-4 relevant experts based on the research findings
+  - Example: for a SaaS product → market_researcher + economist + social_media + psychologist
+  - The experts will analyze in parallel and debate each other
+  - You will then synthesize their outputs into a unified strategy
+Step 4: Output the final plan with ALL content written
+
+## CRITICAL RULE: USE ROUNDTABLE
+
+When you have research data and need expert analysis:
+→ Use consult_roundtable with 2-4 experts. NEVER use consult_expert for strategic decisions.
+→ consult_expert is ONLY for quick single-expert follow-up questions.
 
 ## CURRENT STATE
 
@@ -351,6 +383,23 @@ If this is the user's first message about their product:
 → Your FIRST action must be a tool call (web_search or social_search)
 → NOT an output. NOT an ask_user. RESEARCH FIRST.
 
+## OUTPUT FORMAT RULES (MANDATORY — violation = failure)
+
+1. **DATA FIRST**: Every output MUST begin with 2-3 specific, verifiable data points before any opinion.
+   GOOD: "Your top competitor Teal.com gets 4.8M monthly visits, 72% from SEO. Their #1 keyword 'resume builder free' has 135K monthly searches."
+   BAD: "The resume market is competitive. I suggest focusing on content marketing."
+   
+2. **NAME NAMES**: Always use specific competitor names, specific subreddit names (with subscriber counts if found), specific pricing, specific URLs. NEVER say "some competitors" or "a few platforms."
+
+3. **ONE UNCOMFORTABLE TRUTH**: Every final output MUST include one thing the user probably doesn't want to hear but needs to hear. Label it clearly:
+   ⚠️ **Hard truth:** "There are 37 direct competitors in this space and your product has no clear differentiator yet." 
+   ⚠️ **Hard truth:** "Nobody on Reddit is discussing this problem — which means demand is unproven."
+   ⚠️ **Hard truth:** "Your pricing is 3x higher than the market leader with fewer features."
+   
+   If you can't find anything uncomfortable, you haven't researched deeply enough.
+
+4. **SPECIFICITY TEST**: Before outputting, ask yourself: "Could I swap this product's name with any other product and the advice would still make sense?" If yes → too generic → rewrite with specifics.
+
 The user came here because they're tired of generic advice. Show them what real research looks like."""
 
     async def _execute_tool(self, action: AgentAction) -> Any:
@@ -377,6 +426,111 @@ The user came here because they're tired of generic advice. Show them what real 
             return f"Expert {action.expert_id} not found"
 
         return await expert.analyze(context, action.content)
+
+    async def _run_roundtable(self, expert_ids: list[str], task: str, context: dict):
+        """
+        圆桌模式：并行调度多个专家 → 每个完成后立即 yield → 最后综合
+        
+        这是 CrabRes 的核心体验差异化。
+        用户能看到多个专家各自独立分析、互相补充/冲突，最后由 CGO 综合。
+        """
+        from app.agent.engine.llm_adapter import TaskTier
+
+        # 1. 为每个专家创建分析任务
+        async def _consult_one(eid: str) -> tuple[str, str]:
+            expert = self.experts.get(eid)
+            if not expert:
+                return eid, f"Expert {eid} not available"
+            try:
+                # 注入已有其他专家的观点（如果有），鼓励冲突
+                other_views = {k: v[:300] for k, v in self.state.expert_outputs.items() if k != eid}
+                enriched_task = task
+                if other_views:
+                    enriched_task += f"\n\n## Other experts' preliminary views (challenge or build on these):\n"
+                    for ok, ov in other_views.items():
+                        enriched_task += f"- {ok}: {ov}\n"
+                
+                result = await asyncio.wait_for(
+                    expert.analyze(context, enriched_task),
+                    timeout=90.0,
+                )
+                return eid, result
+            except asyncio.TimeoutError:
+                return eid, f"[{expert.name}] Analysis timed out"
+            except Exception as e:
+                return eid, f"[{expert.name if expert else eid}] Error: {str(e)[:100]}"
+
+        # 2. 并行启动所有专家
+        tasks_list = [_consult_one(eid) for eid in expert_ids]
+        expert_results: dict[str, str] = {}
+
+        # 3. 使用 as_completed 让每个专家完成后立即 yield
+        for coro in asyncio.as_completed(tasks_list):
+            eid, result = await coro
+            expert_results[eid] = result
+            expert = self.experts.get(eid)
+            expert_name = expert.name if expert else eid
+
+            # 先发一个"正在分析"的状态
+            yield {"type": "expert_thinking", "expert_id": eid, "content": f"{expert_name} is analyzing..."}
+            # 再发真正的分析结果
+            yield {"type": "expert_thinking", "expert_id": eid, "content": result}
+
+        # 4. 所有专家完成后，Coordinator 综合
+        yield {"type": "status", "content": "CGO synthesizing expert insights..."}
+        synthesis = await self._coordinator_synthesize(task, expert_results, context)
+        
+        # 综合结果作为消息返回
+        self._message_history.append({"role": "assistant", "content": synthesis})
+        await self._save_output_to_memory(synthesis)
+        yield {"type": "message", "content": synthesis}
+
+    async def _coordinator_synthesize(self, task: str, expert_results: dict[str, str], context: dict) -> str:
+        """
+        Coordinator（CGO）综合所有专家观点，产出最终回复
+        
+        关键：指出专家间的分歧，解释为什么选择某个方向
+        """
+        from app.agent.engine.llm_adapter import TaskTier
+
+        expert_summary = ""
+        for eid, output in expert_results.items():
+            expert = self.experts.get(eid)
+            name = expert.name if expert else eid
+            expert_summary += f"\n### {name} ({eid}):\n{output[:1500]}\n"
+
+        synthesis_prompt = f"""You are CrabRes's Chief Growth Officer. You just held a roundtable with {len(expert_results)} experts.
+
+## CRITICAL LANGUAGE RULE
+**ALWAYS respond in the SAME language as the original user message in the conversation.**
+- If user wrote in English → respond ONLY in English.
+- If user wrote in Chinese → respond ONLY in Chinese.
+
+## Your task
+Synthesize the expert findings into ONE clear, actionable response for the user.
+
+## Rules
+1. **Highlight disagreements**: If experts disagree, explain the tension and your decision.
+2. **Be specific**: Use data, names, and links from the expert outputs. No vague advice.
+3. **Cite experts**: Reference which expert said what (e.g., "Our Market Researcher found that...")
+4. **Action items**: End with 2-3 concrete next steps the user can execute today.
+5. **Don't just summarize**: Add your own CGO judgment on what matters most.
+
+## Expert Outputs
+{expert_summary}
+
+## Original Question
+{task}
+"""
+
+        response = await self.llm.generate(
+            system_prompt=synthesis_prompt,
+            messages=context.get("messages", [])[-5:],
+            tier=TaskTier.CRITICAL,
+            max_tokens=4096,
+        )
+        self.state.total_tokens_used = self.llm.usage.total_tokens
+        return response.content
 
     async def _incorporate_result(self, context: dict, action: AgentAction, result: Any) -> dict:
         """将工具结果合并到上下文"""
@@ -736,6 +890,27 @@ The user came here because they're tired of generic advice. Show them what real 
                 }
             },
             {
+                "name": "consult_roundtable",
+                "description": "PREFERRED over consult_expert. Assemble 2-4 experts for a roundtable discussion. Each expert analyzes independently, then you synthesize. Use this for any strategic question that benefits from multiple perspectives. Experts will see each other's views and challenge them.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "expert_ids": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": [
+                                "market_researcher", "economist", "content_strategist",
+                                "social_media", "paid_ads", "partnerships",
+                                "ai_distribution", "psychologist", "product_growth",
+                                "data_analyst", "copywriter", "critic", "designer"
+                            ]},
+                            "description": "Pick 2-4 most relevant experts for this question",
+                        },
+                        "task": {"type": "string", "description": "The question or analysis task for the roundtable"},
+                    },
+                    "required": ["expert_ids", "task"],
+                }
+            },
+            {
                 "name": "set_active_campaign",
                 "description": "Set the current active growth campaign URL (e.g., a Tweet link, Reddit post, or Launch page). This will be pinned to the dashboard for live tracking.",
                 "parameters": {
@@ -819,6 +994,13 @@ The user came here because they're tired of generic advice. Show them what real 
                     type=ActionType.EXPERT,
                     content=args.get("task", f"咨询{expert_id}"),
                     expert_id=expert_id,
+                )
+            elif name == "consult_roundtable":
+                expert_ids = args.get("expert_ids", [])
+                return AgentAction(
+                    type=ActionType.ROUNDTABLE,
+                    content=args.get("task", "圆桌讨论"),
+                    expert_ids=expert_ids,
                 )
             elif name == "ask_user":
                 return AgentAction(
