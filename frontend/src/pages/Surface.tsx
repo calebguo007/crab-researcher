@@ -17,11 +17,46 @@ interface SurfaceProps {
   onSettings?: () => void
 }
 
+/**
+ * 精准计算 X (Twitter) 字符长度
+ * 规则：
+ * 1. 基础 ASCII 字符 (0-127): 1 字符
+ * 2. 非 ASCII (中文, Emojis, 扩展拉丁等): 2 字符
+ * 3. 链接 (http/https): 无论长短统一算 23 字符
+ */
+function calculateTwitterLength(text: string): number {
+  if (!text) return 0
+  
+  let length = 0
+  // 1. 处理链接
+  const urlRegex = /https?:\/\/[^\s]+/g
+  const textWithoutUrls = text.replace(urlRegex, () => {
+    length += 23
+    return ""
+  })
+
+  // 2. 处理剩余字符
+  for (const char of textWithoutUrls) {
+    // 使用 codePointAt 处理 4 字节 Emoji (如 🦀)
+    const codePoint = char.codePointAt(0) || 0
+    if (codePoint <= 127) {
+      length += 1
+    } else {
+      length += 2
+    }
+  }
+  
+  // 考虑到回车符在某些环境下可能被算作 2 字符 (CRLF)，我们强制按 1 字符计，但保留余量
+  return length
+}
+
 export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) {
   const greeting = getGreeting(creature)
   const [discoveries, setDiscoveries] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
+  const [hunterBullets, setHunterBullets] = useState<Record<number, string>>({})
+  const [hunterLoading, setHunterLoading] = useState<Record<number, boolean>>({})
 
   // 加载真实数据
   useEffect(() => {
@@ -41,6 +76,20 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
     const interval = setInterval(load, 60_000)
     return () => clearInterval(interval)
   }, [])
+
+  const generateBullet = async (index: number) => {
+    setHunterLoading(prev => ({ ...prev, index: true }))
+    // 模拟从后端专家获取子弹文案
+    setTimeout(() => {
+      const mockBullets = [
+        "BUILDING IS SOLVED. DISTRIBUTION IS OUR BATTLEFIELD. 🦀🎯\n\nMost startups die in ghost towns. We're launching #CrabRes: 13 AI experts hunting for your users 24/7. 🚀\n\nThe voyage begins. Join the war room.\n\n@Accio_official #MyAccioWorks #VibeSellingChallenge #GrowthHacking #AIAgents",
+        "Stop guessing where your users are. 🕵️‍♂️\n\nI just found 40% of your competitor's traffic coming from a niche subreddit you've never heard of. My experts have the roadmap ready. 🗺️\n\nCrabRes: The hunter for your first 100 users.\n\n#CrabRes #GrowthMarketing #SaaS",
+        "You built the product. Now get the users. 💥\n\nOur 13-expert Roundtable doesn't just give advice—it hunts. We've mapped out the distribution gaps in your market. 🦀🎯\n\nClaim your growth plan now.\n\n@Accio_official #CrabRes #DistributionIsKing",
+      ]
+      setHunterBullets(prev => ({ ...prev, [index]: mockBullets[index % 3] }))
+      setHunterLoading(prev => ({ ...prev, index: false }))
+    }, 1500)
+  }
 
   return (
     <div className="min-h-screen bg-surface bg-grid bg-noise flex flex-col items-center px-4 py-8 max-w-lg mx-auto relative z-10">
@@ -113,6 +162,98 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         </div>
       </div>
 
+      {/* 增长猎手 (Growth Hunter) - 新模块 */}
+      <div className="w-full mb-8 relative">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-medium text-brand uppercase tracking-widest font-heading flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-brand"></span>
+            </span>
+            {creature.market === 'global' ? 'Growth Hunter' : '增长猎手'}
+          </h3>
+          <span className="text-[10px] text-muted font-mono uppercase tracking-tighter">Hunter Mode: Active</span>
+        </div>
+        
+        <div className="card bg-brand/5 border-brand/20 p-5 overflow-hidden relative group">
+          {/* 背景雷达装饰 */}
+          <div className="absolute -right-10 -top-10 w-40 h-40 border border-brand/10 rounded-full animate-pulse pointer-events-none"></div>
+          <div className="absolute -right-5 -top-5 w-20 h-20 border border-brand/5 rounded-full pointer-events-none"></div>
+          
+          <div className="relative z-10">
+            <p className="text-sm font-bold text-primary mb-1">
+              {creature.market === 'global' ? '5 Targeted Leads Found' : '发现 5 个精准猎杀目标'}
+            </p>
+            <p className="text-xs text-secondary mb-4 opacity-80 leading-relaxed">
+              {creature.market === 'global' 
+                ? 'Experts identified founders struggling with distribution. Ready for engagement.' 
+                : '专家团锁定了正在为分发发愁的创始人。已准备好“降维打击”话术。'}
+            </p>
+            
+            <div className="space-y-3">
+              {[0, 1, 2].map(i => {
+                const bullet = hunterBullets[i]
+                const loading = hunterLoading[i]
+                // 核心：使用精准的 Twitter 长度算法
+                const charCount = calculateTwitterLength(bullet || "")
+                const isOverLimit = charCount > 280
+
+                return (
+                  <div key={i} className="rounded-xl bg-black/20 border border-white/5 overflow-hidden transition-all">
+                    <div className="flex items-center justify-between p-3 cursor-pointer group/item hover:bg-black/20"
+                      onClick={() => !bullet && generateBullet(i)}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center text-brand text-xs font-bold">#0{i+1}</div>
+                        <div>
+                          <div className="text-xs font-bold text-primary">Target Group: {i === 0 ? 'r/SaaS' : i === 1 ? 'r/IndieHackers' : 'X/Founders'}</div>
+                          <div className="text-[10px] text-muted">Awaiting your response...</div>
+                        </div>
+                      </div>
+                      {!bullet ? (
+                        <button className="text-[10px] font-bold text-brand px-3 py-1.5 rounded-lg border border-brand/20 hover:bg-brand hover:text-white transition-all disabled:opacity-50"
+                          disabled={loading}>
+                          {loading ? (creature.market === 'global' ? 'GENERATING...' : '生成中...') : (creature.market === 'global' ? 'GENERATE BULLET' : '生成子弹')}
+                        </button>
+                      ) : (
+                        <div className={`text-[10px] font-mono font-bold ${isOverLimit ? 'text-red-500 animate-pulse' : 'text-success'}`}>
+                          {charCount}/280
+                        </div>
+                      )}
+                    </div>
+                    
+                    {bullet && (
+                      <div className="px-4 pb-4 animate-fade-in">
+                        <textarea 
+                          value={bullet}
+                          onChange={(e) => setHunterBullets(prev => ({ ...prev, [i]: e.target.value }))}
+                          className={`w-full bg-black/40 border p-3 rounded-lg text-xs font-mono leading-relaxed transition-colors focus:outline-none ${isOverLimit ? 'border-red-500/50 focus:border-red-500' : 'border-white/10 focus:border-brand/50'}`}
+                          rows={4}
+                        />
+                        <div className="flex justify-between items-center mt-3">
+                           <p className={`text-[9px] italic font-medium ${isOverLimit ? 'text-red-400' : 'text-muted'}`}>
+                             {isOverLimit 
+                               ? (creature.market === 'global' ? '❌ EXCEEDS X LIMIT!' : '❌ 超出 X 平台限制！') 
+                               : (creature.market === 'global' ? '✓ Ready to send' : '✓ 已就绪')}
+                           </p>
+                           <button className="btn-primary !px-4 !py-1.5 !text-[10px] disabled:opacity-50 disabled:bg-gray-700 disabled:cursor-not-allowed" 
+                             disabled={isOverLimit || loading}>
+                             {creature.market === 'global' ? 'SEND NOW' : '立即发送'}
+                           </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+            
+            <button className="w-full mt-4 py-2 text-[11px] font-bold text-muted hover:text-brand transition-colors uppercase tracking-widest border-t border-white/5 pt-4">
+              {creature.market === 'global' ? 'View Hunter Dashboard →' : '进入猎手中心 →'}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* 发现 */}
       <div className="w-full mb-8">
         <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3">
@@ -154,26 +295,26 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
 
 function MetricCard({ value, label, accent }: { value: string; label: string; accent?: boolean }) {
   return (
-    <div className="text-center">
-      <div className={`font-heading text-2xl font-bold tracking-tight ${accent ? 'text-brand' : 'text-primary'}`}>
+    <div className="text-center group cursor-default">
+      <div className={`font-heading text-3xl font-extrabold tracking-tighter transition-all group-hover:scale-110 ${accent ? 'text-brand drop-shadow-[0_0_15px_var(--brand-glow)]' : 'text-primary'}`}>
         {value}
       </div>
-      <div className="text-xs text-muted mt-0.5 font-heading">{label}</div>
+      <div className="text-[10px] text-muted mt-1 font-heading font-bold uppercase tracking-widest opacity-60 group-hover:opacity-100 transition-opacity">{label}</div>
     </div>
   )
 }
 
 function TaskCard({ icon, title, subtitle, action }: { icon: React.ReactNode; title: string; subtitle: string; action: string }) {
   return (
-    <div className="flex items-center gap-3 p-4 rounded-2xl bg-glass border border-border hover:border-brand/20 transition-colors group">
-      <div className="w-9 h-9 rounded-xl bg-brand/8 flex items-center justify-center text-brand shrink-0">
+    <div className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border hover:border-brand/30 transition-all group hover:shadow-glow">
+      <div className="w-9 h-9 rounded-xl bg-brand/10 flex items-center justify-center text-brand shrink-0">
         {icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-primary">{title}</p>
-        <p className="text-xs text-muted truncate">{subtitle}</p>
+        <p className="text-sm font-bold text-primary tracking-tight">{title}</p>
+        <p className="text-xs text-muted truncate opacity-70 font-mono tracking-tighter">{subtitle}</p>
       </div>
-      <button className="text-xs font-medium text-brand opacity-0 group-hover:opacity-100 transition-opacity px-3 py-1.5 rounded-lg hover:bg-brand/8">
+      <button className="text-[11px] font-bold text-brand opacity-0 group-hover:opacity-100 transition-all px-3 py-1.5 rounded-lg border border-brand/20 hover:bg-brand hover:text-white">
         {action} →
       </button>
     </div>
@@ -182,14 +323,14 @@ function TaskCard({ icon, title, subtitle, action }: { icon: React.ReactNode; ti
 
 function DiscoveryCard({ title, action }: { title: string; action: string }) {
   return (
-    <div className="flex items-center gap-3 p-4 rounded-2xl bg-glass border border-border hover:border-amber-200 transition-colors group">
-      <div className="w-9 h-9 rounded-xl bg-amber-50 flex items-center justify-center text-amber-500 shrink-0">
+    <div className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border hover:border-accent/30 transition-all group hover:shadow-lg">
+      <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center text-accent shrink-0">
         <ZapIcon />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-primary">{title}</p>
+        <p className="text-sm font-bold text-primary tracking-tight">{title}</p>
       </div>
-      <button className="text-xs font-medium text-amber-600 opacity-0 group-hover:opacity-100 transition-opacity px-3 py-1.5 rounded-lg hover:bg-amber-50">
+      <button className="text-[11px] font-bold text-accent opacity-0 group-hover:opacity-100 transition-all px-3 py-1.5 rounded-lg border border-accent/20 hover:bg-accent hover:text-white">
         {action} →
       </button>
     </div>

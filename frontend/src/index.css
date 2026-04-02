@@ -11,32 +11,32 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  /* 色板 */
-  --bg-primary: #FAFBFE;
-  --bg-secondary: #F1F3F9;
-  --bg-card: rgba(255, 255, 255, 0.72);
-  --bg-card-hover: rgba(255, 255, 255, 0.88);
-  --bg-subtle: rgba(0, 0, 0, 0.025);
+  /* 色板 - Dark Tech Mode (Default) */
+  --bg-primary: #05070A;
+  --bg-secondary: #0D1117;
+  --bg-card: rgba(13, 17, 23, 0.72);
+  --bg-card-hover: rgba(22, 27, 34, 0.88);
+  --bg-subtle: rgba(255, 255, 255, 0.03);
 
-  --text-primary: #0F172A;
-  --text-secondary: #3B4963;
-  --text-muted: #8896AB;
-  --text-inverted: #FFFFFF;
+  --text-primary: #F0F6FC;
+  --text-secondary: #C9D1D9;
+  --text-muted: #8B949E;
+  --text-inverted: #05070A;
 
-  --border-default: rgba(15, 23, 42, 0.06);
-  --border-hover: rgba(15, 23, 42, 0.12);
+  --border-default: rgba(240, 246, 252, 0.1);
+  --border-hover: rgba(240, 246, 252, 0.2);
 
-  --brand: #0EA5E9;
-  --brand-hover: #0284C7;
-  --brand-light: #E0F7FF;
-  --brand-glow: rgba(14, 165, 233, 0.15);
+  --brand: #58A6FF;
+  --brand-hover: #388BFD;
+  --brand-light: rgba(88, 166, 255, 0.15);
+  --brand-glow: rgba(88, 166, 255, 0.25);
 
-  --accent: #F97316;
-  --accent-light: #FFF3E8;
+  --accent: #D29922;
+  --accent-light: rgba(210, 153, 34, 0.15);
 
-  --success: #10B981;
-  --warning: #F59E0B;
-  --error: #EF4444;
+  --success: #3FB950;
+  --warning: #D29922;
+  --error: #F85149;
 
   /* 排版 */
   --font-heading: 'Space Grotesk', system-ui, sans-serif;
@@ -50,46 +50,26 @@
   --radius-xl: 28px;
   --radius-full: 9999px;
 
-  /* 阴影 */
-  --shadow-sm: 0 1px 3px rgba(15,23,42,0.04), 0 1px 2px rgba(15,23,42,0.02);
-  --shadow-md: 0 4px 16px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.04);
-  --shadow-lg: 0 12px 40px rgba(15,23,42,0.08), 0 4px 12px rgba(15,23,42,0.04);
-  --shadow-glow: 0 0 30px var(--brand-glow);
-}
-
-/* 暗色模式 */
-.dark, [data-theme="dark"] {
-  --bg-primary: #0B0F1A;
-  --bg-secondary: #111827;
-  --bg-card: rgba(30, 41, 59, 0.6);
-  --bg-card-hover: rgba(30, 41, 59, 0.8);
-  --bg-subtle: rgba(255, 255, 255, 0.03);
-
-  --text-primary: #E8EDF5;
-  --text-secondary: #94A3B8;
-  --text-muted: #64748B;
-
-  --border-default: rgba(255, 255, 255, 0.06);
-  --border-hover: rgba(255, 255, 255, 0.12);
-
-  --brand-light: rgba(14, 165, 233, 0.12);
-  --accent-light: rgba(249, 115, 22, 0.12);
-
+/* 阴影与发光 */
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.3);
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.4);
+  --shadow-glow: 0 0 30px var(--brand-glow);
 }
 
+/* 移除原本的 .dark 覆盖，让 root 就是 Dark Tech */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
   font-family: var(--font-body);
   background: var(--bg-primary);
+  background-image: radial-gradient(circle at 50% 50%, #111827 0%, #05070A 100%);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
   font-size: 15px;
+  min-height: 100vh;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -102,9 +82,24 @@ h1, h2, h3, h4, h5, h6 {
 
 .bg-grid {
   background-image:
-    linear-gradient(rgba(14,165,233,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(14,165,233,0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
+    linear-gradient(rgba(88,166,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(88,166,255,0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.bg-scanline {
+  position: relative;
+}
+
+.bg-scanline::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.02), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.02));
+  z-index: 2;
+  background-size: 100% 4px, 3px 100%;
+  pointer-events: none;
 }
 
 .bg-noise::after {

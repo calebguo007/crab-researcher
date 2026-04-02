@@ -1,0 +1,12 @@
+{
+  "name": "crabres",
+  "version": "1.0.0",
+  "description": "CrabRes CLI — AI Growth Agent in your terminal",
+  "main": "index.js",
+  "bin": {
+    "crabres": "./index.js"
+  },
+  "type": "module",
+  "keywords": ["growth", "marketing", "ai", "agent", "indie-hacker"],
+  "license": "MIT"
+}

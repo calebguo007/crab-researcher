@@ -158,13 +158,13 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
                   onClick={() => setMarket(m.value)}
                   className={`w-full p-4 rounded-xl text-left border transition-all ${
                     market === m.value
-                      ? 'border-brand bg-brand/5'
-                      : 'border-border bg-card/50 hover:border-brand/30'
+                      ? 'border-brand bg-brand/10 shadow-glow'
+                      : 'border-white/5 bg-card hover:border-brand/30'
                   }`}
                 >
                   <div className="flex items-center gap-3 mb-1">
                     <span className="text-2xl">{m.icon}</span>
-                    <span className={`font-bold ${market === m.value ? 'text-brand' : 'text-primary'}`}>{m.label}</span>
+                    <span className={`font-bold tracking-tight ${market === m.value ? 'text-brand' : 'text-primary'}`}>{m.label}</span>
                   </div>
                   <p className="text-xs text-muted leading-relaxed pl-9">{m.desc}</p>
                 </button>
@@ -236,8 +236,8 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
                       onClick={() => setProductType(t.value)}
                       className={`p-2.5 rounded-xl text-left text-sm border transition-all ${
                         productType === t.value
-                          ? 'border-brand bg-brand/5 text-primary'
-                          : 'border-border text-secondary hover:border-brand/30'
+                          ? 'border-brand bg-brand/10 text-brand font-bold'
+                          : 'border-white/5 bg-card text-secondary hover:border-brand/30'
                       }`}
                     >
                       <span className="mr-1.5">{t.icon}</span>{t.label}
@@ -384,10 +384,6 @@ export function Onboarding({ userId, onComplete }: OnboardingProps) {
             </p>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
       </div>
     </div>
   )

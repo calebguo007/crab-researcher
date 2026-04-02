@@ -1,0 +1,36 @@
+# CrabRes MCP Server Configuration for Smithery
+# https://smithery.ai
+
+name: crabres
+version: 1.0.0
+description: "AI Growth Strategy Agent — Research competitors, validate product direction, and create growth plans with ready-to-use content for any product."
+vendor: CrabRes
+homepage: https://crabres.com
+repository: https://github.com/velmavalienteqejimu22-jpg/crab-researcher
+
+transport:
+  type: http
+  url: https://crab-researcher.onrender.com/api/mcp
+
+tools:
+  - name: analyze_growth
+    description: "Analyze a product's growth potential. Researches competitors, finds target users, and suggests strategies."
+    
+  - name: find_competitors
+    description: "Find and analyze competitors for a product or niche. Returns names, pricing, traffic sources."
+    
+  - name: find_target_users
+    description: "Find where target users hang out online. Searches Reddit, HN, X, ProductHunt for discussions."
+
+categories:
+  - marketing
+  - growth
+  - research
+  - strategy
+
+tags:
+  - growth-hacking
+  - competitor-analysis
+  - marketing-strategy
+  - indie-hacker
+  - startup
