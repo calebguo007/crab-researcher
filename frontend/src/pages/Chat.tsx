@@ -36,6 +36,7 @@ export function Chat({ creature, onBack }: ChatProps) {
   const [loading, setLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [expandedExperts, setExpandedExperts] = useState<Set<string>>(new Set())
+  const [showRoundtable, setShowRoundtable] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -99,6 +100,9 @@ export function Chat({ creature, onBack }: ChatProps) {
     })
   }
 
+  // 收集所有专家消息
+  const expertMessages = messages.filter(m => m.role === 'expert')
+
   // 将连续的 expert 消息分组
   const groupedMessages = groupMessages(messages)
 
@@ -122,6 +126,70 @@ export function Chat({ creature, onBack }: ChatProps) {
           </span>
         )}
       </div>
+
+      {/* 圆桌状态面板 — 显示专家工作状态 */}
+      {(loading || expertMessages.length > 0) && (
+        <div className="px-4 py-2 border-b border-border bg-surface">
+          <button
+            onClick={() => setShowRoundtable(!showRoundtable)}
+            className="w-full flex items-center gap-2 text-xs text-muted hover:text-secondary transition-colors"
+          >
+            <RoundtableIcon />
+            <span className="font-heading font-medium">
+              Expert Roundtable {expertMessages.length > 0 ? `(${expertMessages.length} contributions)` : ''}
+            </span>
+            <span className="ml-auto">{showRoundtable ? '▲' : '▼'}</span>
+          </button>
+
+          {showRoundtable && (
+            <div className="mt-2 space-y-2 animate-fade-in">
+              {/* 活跃专家 */}
+              <div className="flex flex-wrap gap-1.5">
+                {Object.keys(EXPERT_NAMES).map(eid => {
+                  const isActive = expertMessages.some(m => m.expertId === eid)
+                  const isWorking = loading && !isActive
+                  return (
+                    <span
+                      key={eid}
+                      className={`text-[10px] px-2 py-1 rounded-full border transition-all ${
+                        isActive
+                          ? 'border-brand/30 bg-brand/5 text-brand'
+                          : isWorking
+                          ? 'border-border bg-hover text-muted animate-pulse'
+                          : 'border-transparent text-muted/50'
+                      }`}
+                    >
+                      {EXPERT_NAMES[eid]?.split(' ')[0]} {isActive ? '✓' : ''}
+                    </span>
+                  )
+                })}
+              </div>
+
+              {/* 专家发言摘要 */}
+              {expertMessages.length > 0 && (
+                <div className="space-y-1.5 pl-2 border-l-2 border-brand/15">
+                  {expertMessages.slice(-5).map(m => (
+                    <div key={m.id} className="text-xs">
+                      <span className="font-medium text-brand">
+                        {EXPERT_NAMES[m.expertId || ''] || 'Expert'}
+                      </span>
+                      <p className="text-secondary mt-0.5 line-clamp-2">
+                        {m.content.slice(0, 150)}{m.content.length > 150 ? '...' : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {loading && expertMessages.length === 0 && (
+                <p className="text-xs text-muted italic">
+                  Researching your market... experts will speak as they find insights.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 消息区 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
