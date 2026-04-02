@@ -22,6 +22,8 @@ from app.api.v2 import brand as brand_v2
 from app.api.v2 import creature as creature_v2
 from app.api.v2 import simulate as simulate_v2
 from app.api.v2 import execute as execute_v2
+from app.channels.feishu_bot import router as feishu_router
+from app.channels.openclaw_skill import router as openclaw_router
 from app.services.scheduler import MonitoringScheduler
 from app.agent.daemon import GrowthDaemon
 from app.agent.notifications import NotificationHub
@@ -108,6 +110,10 @@ app.include_router(brand_v2.router, prefix=settings.API_PREFIX)
 app.include_router(creature_v2.router, prefix=settings.API_PREFIX)
 app.include_router(simulate_v2.router, prefix=settings.API_PREFIX)
 app.include_router(execute_v2.router, prefix=settings.API_PREFIX)
+
+# 渠道路由
+app.include_router(feishu_router, prefix=settings.API_PREFIX)
+app.include_router(openclaw_router, prefix=settings.API_PREFIX)
 
 
 @app.get("/", tags=["Root"])

@@ -36,6 +36,8 @@ class Settings(BaseSettings):
     WECOM_WEBHOOK_URL: Optional[str] = None
     FEISHU_WEBHOOK_URL: Optional[str] = None
     FEISHU_WEBHOOK_SECRET: Optional[str] = None
+    FEISHU_APP_ID: Optional[str] = None
+    FEISHU_APP_SECRET: Optional[str] = None
 
     # ========== 消息平台（海外）==========
     DISCORD_WEBHOOK_URL: Optional[str] = None
