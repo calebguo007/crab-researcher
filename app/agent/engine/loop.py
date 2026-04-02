@@ -53,6 +53,7 @@ class AgentAction:
     tool_args: Optional[dict] = None
     expert_id: Optional[str] = None
     metadata: dict = field(default_factory=dict)
+    parallel_tools: list = field(default_factory=list)  # 并发执行的额外工具
 
 
 @dataclass 
@@ -121,11 +122,24 @@ class AgentLoop:
                 decision = await self._think(context)
 
                 if decision.type == ActionType.OUTPUT:
-                    # 最终输出给用户
-                    self._message_history.append({"role": "assistant", "content": decision.content})
-                    # 自动存储输出到记忆（让 Plan/Surface 能读取）
-                    await self._save_output_to_memory(decision.content)
-                    yield {"type": "message", "content": decision.content}
+                    content = decision.content
+                    # 自动 Critic 审核（如果输出足够长且是策略内容）
+                    if len(content) > 500 and self.state.turn_count >= 2:
+                        critic = self.experts.get("critic")
+                        if critic:
+                            yield {"type": "status", "content": "Strategy Critic reviewing..."}
+                            try:
+                                review = await critic.analyze(context, f"Review this growth strategy for quality, feasibility, and specificity:\n\n{content[:2000]}")
+                                if review and "❌" in review:
+                                    # Critic 发现严重问题，加到输出里
+                                    content += f"\n\n---\n⚖️ **Critic Review:**\n{review}"
+                                    yield {"type": "expert_thinking", "expert_id": "critic", "content": review}
+                            except Exception as e:
+                                logger.warning(f"Critic review failed: {e}")
+
+                    self._message_history.append({"role": "assistant", "content": content})
+                    await self._save_output_to_memory(content)
+                    yield {"type": "message", "content": content}
                     break
 
                 elif decision.type == ActionType.ASK_USER:
@@ -136,17 +150,31 @@ class AgentLoop:
                     break
 
                 elif decision.type == ActionType.TOOL_CALL:
-                    # 2. ACT: 执行工具
+                    # 2. ACT: 执行工具（支持并发）
                     yield {"type": "status", "content": f"Researching: {decision.content}..."}
-                    result = await self._execute_tool(decision)
-                    # 3. OBSERVE: 将结果加入上下文 + 消息历史
-                    context = self._incorporate_result(context, decision, result)
-                    # 把工具结果作为 assistant 消息加入历史（Coordinator 下次能看到）
-                    result_summary = json.dumps(result, ensure_ascii=False, default=str)[:2000]
-                    self._message_history.append({
-                        "role": "assistant",
-                        "content": f"[Tool: {decision.tool_name}] Result: {result_summary}",
-                    })
+
+                    # 检查是否有多个工具调用需要并发
+                    if hasattr(decision, 'parallel_tools') and decision.parallel_tools:
+                        # 并发执行所有工具
+                        tasks = [self._execute_tool(d) for d in [decision] + decision.parallel_tools]
+                        results = await asyncio.gather(*tasks, return_exceptions=True)
+                        for j, (d, r) in enumerate(zip([decision] + decision.parallel_tools, results)):
+                            if isinstance(r, Exception):
+                                r = {"error": str(r)}
+                            context = self._incorporate_result(context, d, r)
+                            result_summary = json.dumps(r, ensure_ascii=False, default=str)[:1500]
+                            self._message_history.append({
+                                "role": "assistant",
+                                "content": f"[Tool: {d.tool_name}] Result: {result_summary}",
+                            })
+                    else:
+                        result = await self._execute_tool(decision)
+                        context = self._incorporate_result(context, decision, result)
+                        result_summary = json.dumps(result, ensure_ascii=False, default=str)[:2000]
+                        self._message_history.append({
+                            "role": "assistant",
+                            "content": f"[Tool: {decision.tool_name}] Result: {result_summary}",
+                        })
 
                 elif decision.type == ActionType.EXPERT:
                     # 调度专家
@@ -727,12 +755,30 @@ The user came here because they're tired of generic advice. Show them what real 
                 )
             elif name in ("web_search", "social_search", "scrape_website", "competitor_analyze", "deep_scrape", "write_post", "write_email", "submit_directory"):
                 # LLM 直接调用工具名
-                return AgentAction(
+                action = AgentAction(
                     type=ActionType.TOOL_CALL,
                     content=f"Using {name}",
                     tool_name=name,
                     tool_args=args,
                 )
+                # 如果有额外的 tool_calls，收集为并行任务
+                if len(response.tool_calls) > 1:
+                    parallel = []
+                    for extra_tc in response.tool_calls[1:]:
+                        extra_name = extra_tc.get("name", "")
+                        extra_args = extra_tc.get("args", {})
+                        if extra_name in ("web_search", "social_search", "scrape_website", "competitor_analyze", "deep_scrape"):
+                            parallel.append(AgentAction(
+                                type=ActionType.TOOL_CALL,
+                                content=f"Using {extra_name}",
+                                tool_name=extra_name,
+                                tool_args=extra_args,
+                            ))
+                    if parallel:
+                        action.parallel_tools = parallel
+                        action.content = f"Running {1 + len(parallel)} tools in parallel"
+                        logger.info(f"Parallel execution: {name} + {[p.tool_name for p in parallel]}")
+                return action
             elif name == "consult_expert":
                 expert_id = args.get("expert_id", "")
                 return AgentAction(
