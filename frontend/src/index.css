@@ -262,6 +262,17 @@ input::placeholder { color: var(--text-muted); }
 .animate-float { animation: float 3.5s ease-in-out infinite; }
 .animate-glow { animation: pulse-glow 3s ease-in-out infinite; }
 
+/* 尊重用户的动画偏好 */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in,
+  .animate-fade-in-scale,
+  .animate-float,
+  .animate-glow {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+
 /* ====== 滚动条 ====== */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

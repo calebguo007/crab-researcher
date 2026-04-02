@@ -7,3 +7,8 @@ dist/
 node_modules/
 .venv/
 .vercel/
+.crabres/
+.DS_Store
+*.log
+*.sqlite
+*.db

@@ -6,13 +6,10 @@
 
 import json
 import logging
-import random
 from datetime import datetime
 from typing import Optional
-from urllib.parse import quote
 
-import httpx
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -22,11 +19,6 @@ from app.services.cost_controller import TaskTier
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
-
-USER_AGENTS = [
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-]
 
 
 class CompetitorDiscoveryService:

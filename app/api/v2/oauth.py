@@ -19,8 +19,8 @@ settings = get_settings()
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/oauth", tags=["OAuth"])
 
-# 前端回调 URL（登录成功后跳转回前端，带上 token）
-FRONTEND_URL = "https://crab-researcher.vercel.app"
+# 前端回调 URL（从配置读取）
+FRONTEND_URL = settings.FRONTEND_URL
 
 
 # ====== Google OAuth ======
@@ -121,7 +121,7 @@ async def github_callback(request: Request):
         raise HTTPException(400, "Could not get email from GitHub")
 
     jwt_token = await _get_or_create_user(email, name, "github")
-    return RedirectResponse(f"{FRONTEND_URL}?token={jwt_token}")
+    return RedirectResponse(f"{FRONTEND_URL}#token={jwt_token}")
 
 
 # ====== 公共逻辑 ======
@@ -133,11 +133,13 @@ async def _get_or_create_user(email: str, name: str, provider: str) -> str:
         user = result.scalar_one_or_none()
 
         if not user:
-            # 新用户自动注册
+            import bcrypt
+            # OAuth 用户存一个不可能匹配的 bcrypt 哈希（防止密码登录）
+            fake_hash = bcrypt.hashpw(f"oauth:{provider}:{email}".encode(), bcrypt.gensalt()).decode()
             user = User(
                 company_name=name or "CrabRes User",
                 contact_email=email,
-                hashed_password="oauth:" + provider,  # OAuth 用户没有密码
+                hashed_password=fake_hash,
                 subscription_plan="free",
                 monthly_budget=100.0,
                 monthly_token_used=0.0,

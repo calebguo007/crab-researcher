@@ -1,5 +1,4 @@
 
-import { useState, useEffect } from 'react'
 import { EXPERTS } from '../../lib/experts'
 
 interface RoundtableSimulationProps {

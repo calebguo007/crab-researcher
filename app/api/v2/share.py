@@ -158,9 +158,12 @@ async def generate_share_card(user_id: int):
 async def get_share_url(current_user: dict = Depends(get_current_user)):
     """获取当前用户的分享卡片 URL"""
     uid = current_user.get("user_id", 0)
-    base = "https://crab-researcher.onrender.com/api"
+    token = _generate_share_token(uid)
+    base = f"{_settings.FRONTEND_URL.rstrip('/')}"
+    api_base = "https://crab-researcher.onrender.com/api"
+    card = f"{api_base}/share/card/{uid}?token={token}"
     return {
-        "card_url": f"{base}/share/card/{uid}",
-        "twitter_share": f"https://twitter.com/intent/tweet?text=Growing%20with%20CrabRes%20🦀&url={base}/share/card/{uid}",
-        "linkedin_share": f"https://www.linkedin.com/sharing/share-offsite/?url={base}/share/card/{uid}",
+        "card_url": card,
+        "twitter_share": f"https://twitter.com/intent/tweet?text=Growing%20with%20CrabRes%20🦀&url={card}",
+        "linkedin_share": f"https://www.linkedin.com/sharing/share-offsite/?url={card}",
     }

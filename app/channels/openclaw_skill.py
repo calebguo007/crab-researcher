@@ -18,6 +18,9 @@ from app.agent.tools.research import WebSearchTool, SocialSearchTool
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/openclaw", tags=["OpenClaw Skill"])
 
+_DAILY_OC_CALLS = 0
+_DAILY_OC_RESET = 0
+
 
 @router.post("/invoke")
 async def openclaw_invoke(request: Request):
@@ -32,6 +35,16 @@ async def openclaw_invoke(request: Request):
         "context": { "user_id": "...", "channel": "wechat" }
     }
     """
+    import time
+    global _DAILY_OC_CALLS, _DAILY_OC_RESET
+    now = int(time.time())
+    if now - _DAILY_OC_RESET > 86400:
+        _DAILY_OC_CALLS = 0
+        _DAILY_OC_RESET = now
+    _DAILY_OC_CALLS += 1
+    if _DAILY_OC_CALLS > 200:
+        return JSONResponse({"error": "Rate limit exceeded"}, status_code=429)
+
     try:
         body = await request.json()
     except Exception:

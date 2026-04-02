@@ -40,8 +40,24 @@ from app.agent.memory import GrowthMemory
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agent"])
 
-# 全局会话存储（MVP 阶段用内存，后续改为持久化）
+# 全局会话存储（带 TTL 和用户隔离）
 _sessions: dict[str, AgentLoop] = {}
+_session_owners: dict[str, int] = {}  # session_id -> user_id
+_session_last_active: dict[str, float] = {}  # session_id -> timestamp
+_SESSION_TTL = 1800  # 30 分钟无活动过期
+
+
+def _cleanup_expired_sessions():
+    """清理过期会话（每次请求时触发）"""
+    import time
+    now = time.time()
+    expired = [sid for sid, ts in _session_last_active.items() if now - ts > _SESSION_TTL]
+    for sid in expired:
+        _sessions.pop(sid, None)
+        _session_owners.pop(sid, None)
+        _session_last_active.pop(sid, None)
+    if expired:
+        logger.info(f"Cleaned up {len(expired)} expired sessions")
 
 
 def _get_or_create_tools() -> ToolRegistry:
@@ -107,14 +123,22 @@ async def agent_chat(
     返回一个列表，因为 Agent 一次对话可能产出多条消息（状态更新 + 最终回复）。
     """
     session_id = req.session_id or str(uuid.uuid4())
+    user_id = current_user.get('user_id', 0)
+
+    # 清理过期会话
+    _cleanup_expired_sessions()
+
+    # 用户隔离检查
+    if session_id in _session_owners and _session_owners[session_id] != user_id:
+        raise HTTPException(status_code=403, detail="Session does not belong to you")
 
     # 获取或创建 Agent Loop
     if session_id not in _sessions:
         llm = AgentLLM()
         tools = _get_or_create_tools()
         experts = _get_or_create_experts()
-        experts.set_llm(llm)  # 专家共享 LLM 实例
-        memory = GrowthMemory(base_dir=f".crabres/memory/{current_user.get('user_id', 'default')}")
+        experts.set_llm(llm)
+        memory = GrowthMemory(base_dir=f".crabres/memory/{user_id}")
 
         loop = AgentLoop(
             session_id=session_id,
@@ -124,8 +148,10 @@ async def agent_chat(
             memory=memory,
         )
         _sessions[session_id] = loop
+        _session_owners[session_id] = user_id
 
     loop = _sessions[session_id]
+    _session_last_active[session_id] = __import__('time').time()
 
     # 运行 Agent Loop，收集所有输出
     outputs: list[ChatResponse] = []

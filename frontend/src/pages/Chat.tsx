@@ -285,9 +285,7 @@ function CollapsibleText({ text, maxLength }: { text: string; maxLength: number 
 }
 
 // 图标
-function ArrowLeftIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-}
+import { ArrowLeftIcon } from '../components/ui/Icons'
 function SendIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
 }

@@ -61,13 +61,13 @@ class GrowthDaemon:
         while self._running:
             try:
                 await self._tick()
+
+                # 午夜边界（在 try 内，异常不会杀死循环）
+                now = datetime.now()
+                if now.hour == 0 and 0 <= now.minute < 5:
+                    await self._midnight_boundary()
             except Exception as e:
                 logger.error(f"Daemon tick error: {e}", exc_info=True)
-
-            # 午夜边界
-            now = datetime.now()
-            if now.hour == 0 and 0 <= now.minute < 5:
-                await self._midnight_boundary()
 
             await asyncio.sleep(self.TICK_INTERVAL)
 
@@ -255,6 +255,23 @@ class GrowthDaemon:
 
         # 触发 Growth Dream（如果条件满足）
         await self.growth_dream()
+
+        # 触发 GrowthDream 对活跃 session 进行深层记忆蒸馏
+        if self.llm:
+            try:
+                from app.agent.engine.dream import GrowthDream
+                dream = GrowthDream(memory=self.memory, llm=self.llm)
+                # 扫描所有持久化的 session state
+                product_dir = self.memory.base_dir / "product"
+                if product_dir.exists():
+                    for state_file in product_dir.glob("loop_state_*.json"):
+                        sid = state_file.stem.replace("loop_state_", "")
+                        try:
+                            await dream.distill(sid)
+                        except Exception as e:
+                            logger.warning(f"Dream distill failed for {sid}: {e}")
+            except Exception as e:
+                logger.error(f"GrowthDream integration failed: {e}")
 
     async def growth_dream(self):
         """

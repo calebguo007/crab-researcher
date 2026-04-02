@@ -1,0 +1,17 @@
+.env
+.env.local
+.git
+.gitignore
+.crabres/
+frontend/
+cli/
+mcp/
+n8n-workflows/
+node_modules/
+__pycache__/
+*.pyc
+*.md
+*.html
+.DS_Store
+.venv/
+dist/

@@ -178,9 +178,6 @@ export function generateCreature(userId: string, productType: string, market: 'g
   const species = pickSpecies(productType, hash)
   const config = SPECIES_CONFIG[species]
 
-  // 颜色微调（同物种不同用户的颜色略有不同）
-  const colorShift = (hash % 20) - 10 // -10 到 +10 的色调偏移
-
   return {
     species,
     mood: 'waving',

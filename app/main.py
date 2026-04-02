@@ -81,10 +81,14 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS
+# CORS — 限制为实际前端域名
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://crab-researcher.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

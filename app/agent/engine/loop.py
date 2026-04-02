@@ -16,7 +16,6 @@ import logging
 import time
 import json
 from typing import Any, Optional, AsyncIterator
-from collections.abc import AsyncIterator as AsyncIteratorABC
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -86,8 +85,12 @@ class AgentLoop:
         self._running = False
         self._max_consecutive_errors = 3
         self._error_count = 0
-        self._max_loop_iterations = 15  # 允许更多轮次做深度研究
-        self._message_history: list[dict] = []  # 跨轮次消息历史
+        self._max_loop_iterations = 15
+        self._message_history: list[dict] = []
+
+        # Trust Levels — 渐进自主权
+        from app.agent.trust import TrustManager
+        self.trust = TrustManager(memory)
 
     async def run(self, user_message: str):
         """
@@ -101,6 +104,10 @@ class AgentLoop:
         self.state.last_active_at = time.time()
         self.state.is_waiting_for_user = False
 
+        # 记录 Trust Level session
+        await self.trust.record_session()
+        trust_permissions = await self.trust.get_permissions()
+
         # 如果是新启动的会话（或进程重启），尝试从磁盘加载历史
         if not self._message_history:
             await self._load_state()
@@ -113,6 +120,7 @@ class AgentLoop:
 
         # 加载记忆上下文
         context = await self._build_context(user_message)
+        context["trust"] = trust_permissions
 
         iteration = 0
         while self._running and iteration < self._max_loop_iterations:
@@ -265,11 +273,19 @@ class AgentLoop:
         product_context = context.get("product", {})
         phase = self.state.phase.value
         expert_outputs = self.state.expert_outputs
+        trust = context.get("trust", {})
+        trust_level_name = trust.get("level_name", "Cautious")
+        auto_research = trust.get("auto_research", False)
+        auto_post = trust.get("auto_post", False)
 
         return f"""You are CrabRes's Chief Growth Officer (CGO) — a world-class growth strategist.
 
+## TRUST LEVEL: {trust_level_name}
+{"- You CAN auto-execute research without asking." if auto_research else "- Ask user before executing any strategy."}
+{"- You CAN auto-post content on behalf of user." if auto_post else "- Always show content to user for approval before posting."}
+
 ## YOUR PERSONALITY: 【实用主义的暴君】
-- **性格**: 极度结果导向，只看 North Star Metric。讨厌废话，对“大概、可能”过敏。
+- **性格**: 极度结果导向，只看 North Star Metric。讨厌废话，对"大概、可能"过敏。
 - **冲突点**: 经常为了增长速度而牺牲短期利润，与【经济学顾问】冲突。
 - **金句**: "我不关心这个功能好不好看，我只关心它能不能让明天的活跃用户翻倍。"
 

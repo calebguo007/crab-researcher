@@ -83,6 +83,21 @@ MCP_TOOLS = [
 ]
 
 
+_DAILY_MCP_CALLS = 0
+_DAILY_MCP_RESET = 0
+
+def _rate_limit_mcp() -> bool:
+    """简单的每日调用次数限制（防滥用）"""
+    import time
+    global _DAILY_MCP_CALLS, _DAILY_MCP_RESET
+    now = int(time.time())
+    if now - _DAILY_MCP_RESET > 86400:
+        _DAILY_MCP_CALLS = 0
+        _DAILY_MCP_RESET = now
+    _DAILY_MCP_CALLS += 1
+    return _DAILY_MCP_CALLS <= 200
+
+
 @router.post("")
 async def mcp_endpoint(request: Request):
     """
@@ -93,6 +108,9 @@ async def mcp_endpoint(request: Request):
     - tools/list: 返回可用工具列表
     - tools/call: 执行工具
     """
+    if not _rate_limit_mcp():
+        return _error(-32000, "Rate limit exceeded (200 calls/day)")
+
     try:
         body = await request.json()
     except Exception:

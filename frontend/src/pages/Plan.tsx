@@ -69,10 +69,17 @@ export function Plan({ creature, onBack }: PlanProps) {
         </button>
         <div className="flex-1">
           <p className="text-sm font-medium text-primary">Growth Plan</p>
-          <p className="text-xs text-muted">v3 · Updated 2 days ago</p>
+          <p className="text-xs text-muted">{plan?.plan?.updated_at ? `Updated ${new Date(plan.plan.updated_at * 1000).toLocaleDateString()}` : 'No plan yet'}</p>
         </div>
-        <button className="btn-ghost !text-xs !py-1.5 !px-3">Export</button>
-        <button className="btn-ghost !text-xs !py-1.5 !px-3">Share</button>
+        <button className="btn-ghost !text-xs !py-1.5 !px-3" onClick={() => {
+          const text = planContent || 'No plan content yet'
+          const blob = new Blob([text], { type: 'text/markdown' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a'); a.href = url; a.download = 'growth-plan.md'; a.click()
+        }}>Export</button>
+        <button className="btn-ghost !text-xs !py-1.5 !px-3" onClick={() => {
+          navigator.clipboard.writeText(planContent || '').then(() => alert('Plan copied to clipboard!'))
+        }}>Share</button>
       </div>
 
       <div className="px-4 py-6 space-y-6">
@@ -97,7 +104,6 @@ export function Plan({ creature, onBack }: PlanProps) {
           <div className="flex items-baseline gap-2 mb-2">
             <span className="text-3xl font-bold text-primary">{progress}</span>
             <span className="text-sm text-muted">/ {goal} users</span>
-            <span className="text-xs text-muted ml-auto">Week 3 of 12</span>
           </div>
 
           {/* 进度条 */}
@@ -107,7 +113,7 @@ export function Plan({ creature, onBack }: PlanProps) {
               style={{ width: `${pct}%` }}
             />
           </div>
-          <p className="text-xs text-muted mt-1">{pct}% · Budget: $200/mo</p>
+          <p className="text-xs text-muted mt-1">{pct}% toward goal</p>
         </div>
 
         {/* 策略卡片 */}
@@ -208,6 +214,4 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function ArrowLeftIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-}
+import { ArrowLeftIcon } from '../components/ui/Icons'

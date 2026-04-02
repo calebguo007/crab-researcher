@@ -2,7 +2,7 @@
  * Settings — 个人管理 + 暗色切换 + 通知配置
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { CreatureRenderer } from '../components/creature/CreatureRenderer'
 import type { CreatureState } from '../components/creature/types'
 import { SPECIES_CONFIG } from '../components/creature/types'
@@ -117,7 +117,7 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
         </section>
 
         {/* 项目 */}
-        <section className="animate-fade-in" style={{ animationDelay: '0.3s', opacity: 0 }}>
+        <section className="animate-fade-in" style={{ animationDelay: '0.3s', animationFillMode: 'forwards', opacity: 0 }}>
           <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">Projects</h3>
           <div className="card p-4">
             <div className="flex items-center gap-3">
@@ -132,22 +132,39 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
               <span className="text-xs text-brand font-mono">Pro</span>
             </div>
           </div>
-          <button className="w-full mt-2 p-3 rounded-md text-sm text-brand font-medium hover:bg-brand-light transition-colors text-center">
+          <button className="w-full mt-2 p-3 rounded-md text-sm text-brand font-medium hover:bg-brand-light transition-colors text-center"
+            onClick={() => alert('Multiple projects coming in Pro plan! Currently in single-project mode.')}>
             + Add new project
           </button>
         </section>
 
         {/* 账户 */}
-        <section className="animate-fade-in" style={{ animationDelay: '0.4s', opacity: 0 }}>
+        <section className="animate-fade-in" style={{ animationDelay: '0.4s', animationFillMode: 'forwards', opacity: 0 }}>
           <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">Account</h3>
           <div className="card overflow-hidden divide-y divide-[var(--border-default)]">
-            <button className="w-full p-4 text-left text-sm text-primary hover:bg-hover transition-colors">
+            <button className="w-full p-4 text-left text-sm text-primary hover:bg-hover transition-colors"
+              onClick={() => window.open('https://crabres.com/#pricing', '_blank')}>
               Manage subscription
             </button>
-            <button className="w-full p-4 text-left text-sm text-primary hover:bg-hover transition-colors">
+            <button className="w-full p-4 text-left text-sm text-primary hover:bg-hover transition-colors"
+              onClick={() => {
+                const token = localStorage.getItem('crabres_token') || ''
+                navigator.clipboard.writeText(token.slice(0, 20) + '...')
+                alert('API token prefix copied. Full API docs at /docs')
+              }}>
               API keys
             </button>
-            <button className="w-full p-4 text-left text-sm text-primary hover:bg-hover transition-colors">
+            <button className="w-full p-4 text-left text-sm text-primary hover:bg-hover transition-colors"
+              onClick={async () => {
+                try {
+                  const { api } = await import('../lib/api')
+                  const plan = await api<any>('/growth/plan').catch(() => null)
+                  const content = plan?.plan?.content || 'No data to export yet. Chat with CrabRes first!'
+                  const blob = new Blob([content], { type: 'text/markdown' })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement('a'); a.href = url; a.download = 'crabres-export.md'; a.click()
+                } catch { alert('Export failed') }
+              }}>
               Export data
             </button>
           </div>
@@ -166,6 +183,4 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
   )
 }
 
-function ArrowIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-}
+import { ArrowLeftIcon as ArrowIcon } from '../components/ui/Icons'

@@ -18,7 +18,7 @@ _connect_args = {}
 if "neon.tech" in settings.DATABASE_URL or "supabase" in settings.DATABASE_URL:
     ssl_ctx = ssl.create_default_context()
     ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
+    ssl_ctx.verify_mode = ssl.CERT_REQUIRED
     _connect_args["ssl"] = ssl_ctx
 
 # 异步引擎

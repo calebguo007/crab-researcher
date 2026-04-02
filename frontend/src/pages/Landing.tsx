@@ -123,7 +123,7 @@ export function Landing({ onGetStarted, onLogin, onCompare }: LandingProps) {
         </div>
 
         <p className="text-xs text-muted">
-          {demoState === 'idle' ? 'Join 300+ products growing with CrabRes' : 'Real research, not templates'}
+          {demoState === 'idle' ? 'Free to start · No credit card required' : 'Real research, not templates'}
         </p>
       </section>
 
@@ -197,19 +197,19 @@ export function Landing({ onGetStarted, onLogin, onCompare }: LandingProps) {
         </div>
       </section>
 
-      {/* 社会证明 */}
+      {/* 产品能力展示 */}
       <section className="px-4 pb-24 max-w-3xl mx-auto relative z-10">
-        <h2 className="font-heading text-3xl font-bold text-primary text-center mb-10">What users say</h2>
+        <h2 className="font-heading text-3xl font-bold text-primary text-center mb-10">What CrabRes does for you</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[
-            { quote: "CrabRes told me my product idea had no market. Saved me 6 months of wasted effort.", author: "@indie_maker" },
-            { quote: "I copy-pasted the Reddit posts it wrote. Got 40 upvotes and 12 signups from ONE post.", author: "@saas_builder" },
-            { quote: "The economist calculated my budget would burn out on ads. Saved $500 by going organic first.", author: "@bootstrapper_22" },
-            { quote: "It suggested I cold-DM career coaches for partnerships. Never would have thought of that myself.", author: "@job_tool_dev" },
+            { quote: "Tells you if your product idea has no market — before you waste months building.", author: "Validation" },
+            { quote: "Writes Reddit posts, cold emails, and outreach DMs you can copy-paste and publish.", author: "Execution" },
+            { quote: "Calculates your budget allocation so you don't burn money on the wrong channels.", author: "Economics" },
+            { quote: "Finds niche communities and partnership opportunities you'd never discover manually.", author: "Discovery" },
           ].map((t, i) => (
-            <div key={i} className="card p-5 animate-fade-in" style={{ animationDelay: `${i * 0.1}s`, opacity: 0 }}>
+            <div key={i} className="card p-5 animate-fade-in" style={{ animationDelay: `${i * 0.1}s`, animationFillMode: 'forwards', opacity: 0 }}>
               <p className="text-sm text-primary leading-relaxed mb-3">"{t.quote}"</p>
-              <p className="text-xs text-muted font-mono">{t.author}</p>
+              <p className="text-xs text-brand font-heading font-semibold">{t.author}</p>
             </div>
           ))}
         </div>
@@ -282,7 +282,7 @@ export function Landing({ onGetStarted, onLogin, onCompare }: LandingProps) {
 
       {/* Footer */}
       <footer className="text-center py-8 border-t border-border relative z-10">
-        <p className="text-xs text-muted">🦀 CrabRes · © 2026 · Privacy · Terms</p>
+        <p className="text-xs text-muted">🦀 CrabRes · © {new Date().getFullYear()} · Privacy · Terms</p>
       </footer>
     </div>
   )

@@ -321,7 +321,9 @@ class NotificationService:
         timestamp = str(int(time.time()))
         string_to_sign = f"{timestamp}\n{secret}"
         hmac_code = hmac.new(
-            string_to_sign.encode("utf-8"), digestmod=hashlib.sha256
+            secret.encode("utf-8"),
+            string_to_sign.encode("utf-8"),
+            digestmod=hashlib.sha256,
         ).digest()
         sign = base64.b64encode(hmac_code).decode("utf-8")
         return timestamp, sign

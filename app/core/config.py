@@ -2,9 +2,14 @@
 CrabRes 配置管理
 """
 
+import secrets
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 from typing import Optional, List
+
+
+def _generate_secret() -> str:
+    return secrets.token_urlsafe(32)
 
 
 class Settings(BaseSettings):
@@ -13,6 +18,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "2.0.0"
     DEBUG: bool = False
     API_PREFIX: str = "/api"
+    FRONTEND_URL: str = "https://crab-researcher.vercel.app"
 
     # ========== 数据库 ==========
     DATABASE_URL: str = "postgresql+asyncpg://postgres:password@localhost:5432/crab_researcher"

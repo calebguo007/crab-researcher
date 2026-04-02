@@ -78,17 +78,23 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
   }, [])
 
   const generateBullet = async (index: number) => {
-    setHunterLoading(prev => ({ ...prev, index: true }))
-    // 模拟从后端专家获取子弹文案
-    setTimeout(() => {
-      const mockBullets = [
-        "BUILDING IS SOLVED. DISTRIBUTION IS OUR BATTLEFIELD. 🦀🎯\n\nMost startups die in ghost towns. We're launching #CrabRes: 13 AI experts hunting for your users 24/7. 🚀\n\nThe voyage begins. Join the war room.\n\n@Accio_official #MyAccioWorks #VibeSellingChallenge #GrowthHacking #AIAgents",
-        "Stop guessing where your users are. 🕵️‍♂️\n\nI just found 40% of your competitor's traffic coming from a niche subreddit you've never heard of. My experts have the roadmap ready. 🗺️\n\nCrabRes: The hunter for your first 100 users.\n\n#CrabRes #GrowthMarketing #SaaS",
-        "You built the product. Now get the users. 💥\n\nOur 13-expert Roundtable doesn't just give advice—it hunts. We've mapped out the distribution gaps in your market. 🦀🎯\n\nClaim your growth plan now.\n\n@Accio_official #CrabRes #DistributionIsKing",
-      ]
-      setHunterBullets(prev => ({ ...prev, [index]: mockBullets[index % 3] }))
-      setHunterLoading(prev => ({ ...prev, index: false }))
-    }, 1500)
+    setHunterLoading(prev => ({ ...prev, [index]: true }))
+    try {
+      const res = await api<any[]>('/agent/chat', {
+        method: 'POST',
+        body: JSON.stringify({
+          message: `Write a ready-to-publish X/Twitter post (under 280 chars) about my product. Make it punchy, authentic, and growth-focused. Target: indie hackers and founders. Include 2-3 relevant hashtags. Post #${index + 1}.`,
+        }),
+      })
+      const content = res.find((r: any) => r.type === 'message')?.content
+        || res[res.length - 1]?.content
+        || 'Could not generate. Try again.'
+      setHunterBullets(prev => ({ ...prev, [index]: content }))
+    } catch {
+      setHunterBullets(prev => ({ ...prev, [index]: '⚠️ Generation failed. Please try again.' }))
+    } finally {
+      setHunterLoading(prev => ({ ...prev, [index]: false }))
+    }
   }
 
   return (
@@ -181,12 +187,14 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
               title={t.title}
               subtitle={t.subtitle || ''}
               action={t.type === 'chat' ? (creature.market === 'global' ? 'Chat' : '开聊') : (creature.market === 'global' ? 'Do it' : '去执行')}
+              onAction={onChat}
             />
           )) : (
             <TaskCard icon={<ChatIcon />} 
               title={creature.market === 'global' ? "Tell CrabRes about your product" : "告诉螃蟹你的产品细节"}
               subtitle={creature.market === 'global' ? "Start a conversation to begin research" : "开始对话以启动深度调研"} 
-              action={creature.market === 'global' ? "Chat" : "开聊"} />
+              action={creature.market === 'global' ? "Chat" : "开聊"}
+              onAction={onChat} />
           )}
         </div>
       </div>
@@ -265,7 +273,22 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
                                : (creature.market === 'global' ? '✓ Ready to send' : '✓ 已就绪')}
                            </p>
                            <button className="btn-primary !px-4 !py-1.5 !text-[10px] disabled:opacity-50 disabled:bg-gray-700 disabled:cursor-not-allowed" 
-                             disabled={isOverLimit || loading}>
+                             disabled={isOverLimit || loading}
+                             onClick={async () => {
+                               try {
+                                 const res = await api<any>('/execute/prepare', {
+                                   method: 'POST',
+                                   body: JSON.stringify({ platform: 'x', content: bullet, action_type: 'post' }),
+                                 })
+                                 if (res.url) {
+                                   navigator.clipboard.writeText(bullet)
+                                   window.open(res.url, '_blank')
+                                 }
+                               } catch {
+                                 navigator.clipboard.writeText(bullet)
+                                 window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(bullet.slice(0, 270))}`, '_blank')
+                               }
+                             }}>
                              {creature.market === 'global' ? 'SEND NOW' : '立即发送'}
                            </button>
                         </div>
@@ -276,7 +299,8 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
               })}
             </div>
             
-            <button className="w-full mt-4 py-2 text-[11px] font-bold text-muted hover:text-brand transition-colors uppercase tracking-widest border-t border-white/5 pt-4">
+            <button className="w-full mt-4 py-2 text-[11px] font-bold text-muted hover:text-brand transition-colors uppercase tracking-widest border-t border-white/5 pt-4"
+              onClick={onPlan}>
               {creature.market === 'global' ? 'View Hunter Dashboard →' : '进入猎手中心 →'}
             </button>
           </div>
@@ -284,7 +308,7 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
       </div>
 
       {/* 发现 */}
-      <div className="w-full mb-8">
+      <div className="w-full mb-8" id="discoveries-section">
         <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3">
           {creature.market === 'global' ? 'Discoveries' : '最新发现'}
         </h3>
@@ -294,6 +318,8 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
               key={i}
               title={d.title || d.change || d.competitor || 'New discovery'}
               action={d.url ? (creature.market === 'global' ? 'View' : '查看') : (creature.market === 'global' ? 'Analyze' : '分析')}
+              onAction={() => d.url ? window.open(d.url, '_blank') : onChat()}
+            />
             />
           )) : (
             <div className="text-center py-6 text-sm text-muted">
@@ -333,7 +359,7 @@ function MetricCard({ value, label, accent }: { value: string; label: string; ac
   )
 }
 
-function TaskCard({ icon, title, subtitle, action }: { icon: React.ReactNode; title: string; subtitle: string; action: string }) {
+function TaskCard({ icon, title, subtitle, action, onAction }: { icon: React.ReactNode; title: string; subtitle: string; action: string; onAction?: () => void }) {
   return (
     <div className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border hover:border-brand/30 transition-all group hover:shadow-glow">
       <div className="w-9 h-9 rounded-xl bg-brand/10 flex items-center justify-center text-brand shrink-0">
@@ -343,14 +369,14 @@ function TaskCard({ icon, title, subtitle, action }: { icon: React.ReactNode; ti
         <p className="text-sm font-bold text-primary tracking-tight">{title}</p>
         <p className="text-xs text-muted truncate opacity-70 font-mono tracking-tighter">{subtitle}</p>
       </div>
-      <button className="text-[11px] font-bold text-brand opacity-0 group-hover:opacity-100 transition-all px-3 py-1.5 rounded-lg border border-brand/20 hover:bg-brand hover:text-white">
+      <button onClick={onAction} className="text-[11px] font-bold text-brand opacity-0 group-hover:opacity-100 transition-all px-3 py-1.5 rounded-lg border border-brand/20 hover:bg-brand hover:text-white">
         {action} →
       </button>
     </div>
   )
 }
 
-function DiscoveryCard({ title, action }: { title: string; action: string }) {
+function DiscoveryCard({ title, action, onAction }: { title: string; action: string; onAction?: () => void }) {
   return (
     <div className="flex items-center gap-3 p-4 rounded-2xl bg-card border border-border hover:border-accent/30 transition-all group hover:shadow-lg">
       <div className="w-9 h-9 rounded-xl bg-accent/10 flex items-center justify-center text-accent shrink-0">
@@ -359,7 +385,7 @@ function DiscoveryCard({ title, action }: { title: string; action: string }) {
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-primary tracking-tight">{title}</p>
       </div>
-      <button className="text-[11px] font-bold text-accent opacity-0 group-hover:opacity-100 transition-all px-3 py-1.5 rounded-lg border border-accent/20 hover:bg-accent hover:text-white">
+      <button onClick={onAction} className="text-[11px] font-bold text-accent opacity-0 group-hover:opacity-100 transition-all px-3 py-1.5 rounded-lg border border-accent/20 hover:bg-accent hover:text-white">
         {action} →
       </button>
     </div>

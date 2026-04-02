@@ -171,11 +171,21 @@ export default function App() {
     if (savedTheme === 'dark') {
       document.documentElement.classList.add('dark')
     }
-    // 处理 OAuth 回调（URL 带 ?token=xxx）
+    // 处理 OAuth 回调（URL 带 #token=xxx，fragment 不会被发到服务器）
+    const hash = window.location.hash
+    if (hash.startsWith('#token=')) {
+      const oauthToken = hash.slice(7)
+      if (oauthToken) {
+        setToken(oauthToken)
+        setAuthed(true)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    }
+    // 兼容旧的 ?token= 格式
     const params = new URLSearchParams(window.location.search)
-    const oauthToken = params.get('token')
-    if (oauthToken) {
-      setToken(oauthToken)
+    const qToken = params.get('token')
+    if (qToken) {
+      setToken(qToken)
       setAuthed(true)
       window.history.replaceState({}, '', window.location.pathname)
     }
@@ -227,7 +237,6 @@ export default function App() {
     )
   }
 
-  // TODO: 实现 Chat 和 Plan 页面
   if (page === 'chat') {
     return <Chat creature={creature} onBack={() => setPage('surface')} />
   }

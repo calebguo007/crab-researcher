@@ -16,7 +16,7 @@ CrabRes Skills 知识注册表
 # 每个专家可引用的知识模块
 # key = expert_id, value = 该专家可调用的知识片段
 
-EXPERT_KNOWLEDGE: dict[str, list[dict]] = {
+EXPERT_KNOWLEDGE: dict[str, list[dict[str, str]]] = {
 
     "market_researcher": [
         {
