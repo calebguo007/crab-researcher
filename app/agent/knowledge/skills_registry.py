@@ -226,152 +226,256 @@ CTA 公式: [动词] + [得到什么] + [限定词]
     "social_media": [
         {
             "name": "x_twitter_deep_knowledge",
-            "source": "CrabRes 2026 platform research + indie hacker community data",
-            "description": "X/Twitter 平台深度运营知识（算法+内容+冷启动+追踪）",
-            "framework": """=== X (TWITTER) PLATFORM DEEP KNOWLEDGE ===
+            "source": "X open-source algorithm reverse-engineering (tang-vu/x-algorithm-playbook) + Calmops 2026 indie hacker guide + 掘金实战心得",
+            "description": "X/Twitter 实战运营知识（算法公式+冷启动+内容+互动+转化）",
+            "framework": """=== X (TWITTER) PLATFORM PRACTITIONER-LEVEL KNOWLEDGE ===
 
-## Algorithm & Recommendation Logic (2026)
-- For You feed ranking: engagement velocity (first 30 min) > total engagement > recency
-- Engagement weight: Reply > Retweet > Like > Bookmark (replies are 10x more valuable than likes)
-- Thread > Single tweet (algorithm treats threads as high-quality content)
-- Image/video tweets get 2-3x more impressions than text-only
-- External links are DEPRIORITIZED — put links in reply, not main tweet
-- New accounts have a 14-day "probation" — algorithm observes behavior before boosting
-- Tweeting 1-3x/day optimal. >5/day hurts unless you're already big
+## Algorithm Scoring Formula (from open-source reverse engineering, 2026 update)
+Post Score = Σ (weight × P(action))
+Algorithm predicts 19 user behaviors with these weights:
+  POSITIVE: Reply (+2×), Quote (+1.5×), Retweet (+1×), Like (+1×), Follow author (+1×)
+  NEGATIVE: Block (-10×), Report (-20×, devastating), Mute (-1×), "Not interested" (-1×)
+  NEUTRAL (but tracked): Click, Dwell time, Profile visit
 
-## Cold Start Strategy (0 → 1000 followers)
-Week 1-2: Reply guy strategy
-  - Find 10 large accounts in your niche (10K-100K followers)
-  - Reply to their tweets within 30 min of posting (early replies get shown)
-  - Reply must ADD VALUE (insight, data, personal experience) — not "great point!"
-  - Goal: 20-30 quality replies/day → their followers notice you
-  
-Week 3-4: Original content
-  - 1 Thread per week (5-12 tweets, educational/story format)
-  - 1-2 single tweets per day (insight, hot take, or build-in-public update)
-  - Thread structure: Hook (tweet 1) → Value points → CTA (last tweet)
-  
-Month 2+: Build in Public
-  - Share real numbers (revenue, users, failures)
-  - Be vulnerable — "I launched and got 0 users" gets more engagement than fake success
-  - Post at 8-10am EST (when US indie hackers are starting their day)
+Key insight: 1 reply = 2 likes in algorithm value. 1 block = -10 likes. AVOID BLOCKS AT ALL COSTS.
 
-## Content Formats That Work
-1. **Thread Hook Formulas:**
-   - "I studied [X] for [time]. Here's what I learned:"
-   - "Most people think [common belief]. They're wrong. Here's why:"
-   - "[Achievement]. Here's the exact playbook (stolen from [authority]):"
-   - "I made $[X] with [product]. Here are the [N] things that actually worked:"
+## Recommendation Pipeline (4 steps)
+1. Candidate Sources:
+   - Thunder: tweets from people you follow (in-network, shown first)
+   - Phoenix: ML-discovered tweets from strangers (out-of-network, harder to get into)
+2. Filtering: 12 filters (too old, blocked author, spam, etc.) — content removed entirely
+3. Scoring: Grok Transformer model predicts engagement probability → weighted score
+4. Ranking: highest scores shown first. Author diversity penalty applied (don't post too frequently)
 
-2. **Single Tweet Formulas:**
-   - Hot take + one-line evidence
-   - Before/After with specific numbers
-   - "Stop doing X. Start doing Y. Here's why:" (contrarian)
-   - Screenshot of real data + 1-sentence commentary
+## 10 Golden Rules (from algorithm reverse-engineering)
+1. REPLIES ARE KING — posts generating replies score ~2x higher
+2. AVOID NEGATIVE SIGNALS — 1 block (-10×) wipes out 10 likes
+3. SPACE YOUR POSTS — author diversity penalty kicks in after first post. Wait 2-4 hours between posts
+4. IN-NETWORK FIRST — your followers see you before strangers do. Build follower base first
+5. MEDIA MATTERS — Video > Image > Text (if video exceeds minimum length threshold)
+6. DWELL TIME COUNTS — longer content = higher engagement signal (threads >> single tweets)
+7. DON'T TRIGGER FILTERS — 12 filters can completely hide your content
+8. AUTHENTIC ENGAGEMENT — algorithm tracks your interaction patterns. No engagement pods
+9. STAY VERTICAL — consistent topic helps retrieval matching
+10. QUALITY > QUANTITY — one great post beats five mediocre ones
 
-3. **What to NEVER do:**
-   - Don't tweet links in main tweet (put in reply)
-   - Don't use >2 hashtags (looks spammy on X)
-   - Don't engage with engagement pods (algorithm detects and penalizes)
-   - Don't buy followers (engagement rate tanks, algorithm deprioritizes)
+## Cold Start Playbook (0 → 1000 followers)
 
-## Key Metrics (what actually matters)
-- Profile visits (people checking you out) > Impressions (vanity)
-- Link clicks (actual traffic) > Likes (feel-good)
-- Follower-to-profile-visit ratio (>10% = good positioning)
-- Thread completion rate (how many read to the end)
+### Account Setup
+- Username: simple, memorable, no underscores/numbers if possible
+- Bio formula: [Who you are] + [What you do] + [Value prop] + [CTA link]
+- Profile photo: clear face, looking at camera, professional
+- Pinned tweet: your best thread or product announcement
 
-## X → Paying Customer Funnel
-Bio link → Landing page with clear CTA → Email capture or signup
-- Bio should be: [What you do] + [Who it's for] + [Social proof] + [Link]
-- Pinned tweet = your best thread or product announcement
-- Never link to homepage — link to a specific landing page with UTM""",
+### Phase 1: 前两周 Reply Guy Strategy
+- Find 10-20 large accounts in your niche (10K-100K followers)
+- Reply to their tweets within 30 min of posting (early replies get top position)
+- Reply MUST add value: data, personal experience, contrarian take (not "great point!")
+- Goal: 20-30 quality replies/day → their followers notice you → follow you
+- This alone can get 200-500 followers in 2 weeks
+
+### Phase 2: 第三四周 Original Content
+- Content ratio: 40% value/教学 + 25% personal/幕后 + 20% engagement + 15% promo
+- 1 Thread per week (5-12 tweets): Hook → Value points → CTA
+- 2-3 single tweets per day
+- Post 3-5 tweets/day when <500 followers (building presence)
+- Reduce to 1-2/day after 1000 followers (quality over quantity)
+
+### Phase 3: Month 2+ Build in Public
+- Share real numbers (MRR, users, failures)
+- Vulnerability > perfection ("I launched and got 0 users" > fake success)
+- Weekly milestones, monthly retrospectives
+
+## Daily Engagement Routine (30-60 min, NON-NEGOTIABLE)
+- Reply to 5-10 tweets from peers/targets (quality replies with data/opinions)
+- Like 20-30 relevant tweets (maintain visibility)
+- Quote retweet 3-5 tweets adding your perspective
+- Check notifications and reply to ALL mentions
+- Best times: 7-9 AM, 12-1 PM, 5-7 PM (user's target timezone). Post 30 min before peak.
+
+## Thread Structure (the #1 growth format)
+Tweet 1 (HOOK — decides everything):
+  Formula: "I [did X / studied X / spent $X]. Here's what [I learned / nobody tells you / actually works]:"
+  Must create curiosity gap. If hook fails, thread dies.
+Tweet 2-N (VALUE):
+  One idea per tweet. Short sentences. Line breaks for readability.
+  Use images/screenshots to break up text.
+  Each tweet should be standalone-readable (people enter mid-thread).
+Last tweet (CTA):
+  "Follow me for more [topic]" or "I'm building [product] — try it free: [link in reply]"
+  NEVER put links in main tweet — put in reply (algorithm penalizes external links)
+
+## Single Tweet Formulas That Work
+- "I [achievement with number]. Here are the [N] things that actually worked:"
+- "Most people think [common belief]. They're wrong. Here's why:"
+- Before/After with specific numbers
+- Screenshot of real data + 1-sentence hot take
+- Contrarian opinion (drives replies which = 2× algorithm boost)
+
+## What Kills Your Reach
+- External links in main tweet (put in reply instead)
+- More than 2 hashtags (looks spammy, this isn't Instagram)
+- Engagement pods (algorithm detects coordinated behavior)
+- Posting >5 times without spacing (author diversity penalty)
+- Getting blocked by multiple users (devastating: -10× each)
+- Deleting tweets (signals low quality to algorithm)
+
+## Conversion: Followers → Customers
+- Bio link → specific landing page with UTM (not homepage)
+- Pinned tweet = social proof (best thread, or launch announcement)
+- DM strategy: only after genuine interaction. Never cold pitch.
+- Monitor keywords related to your product → jump into conversations organically
+- Build relationship before selling (80/20: value/promo)""",
         },
         {
             "name": "xiaohongshu_deep_knowledge",
-            "source": "CrabRes 2026 + 小红书运营专家访谈 + 蝉妈妈数据研究",
-            "description": "小红书平台深度运营知识（算法+内容+种草+达人合作）",
-            "framework": """=== 小红书 (XIAOHONGSHU/RED NOTE) PLATFORM DEEP KNOWLEDGE ===
+            "source": "千万级变现实操经验 + 蝉妈妈/飞瓜数据 + CrabRes 2026 平台研究",
+            "description": "小红书实战运营知识（养号+算法+内容+人设+变现，基于千万级变现实操）",
+            "framework": """=== 小红书 (XIAOHONGSHU/RED NOTE) PRACTITIONER-LEVEL KNOWLEDGE ===
+(来源：已变现千万级的实操总结，不讲概念，一切基于实操)
 
-## Algorithm & Distribution Logic (2026)
-- CES 评分系统（Content Engagement Score）:
-  点赞 1 分 / 收藏 1 分 / 评论 4 分 / 转发 4 分
-  → 评论和转发权重是点赞的 4 倍！内容要引发讨论，不只是"好看"
+## 底层逻辑（必须理解）
+- 小红书是女性友好平台
+- 小红书是种草平台（分享好物，不是卖东西）
+- 小红书是"美好XX分享"平台（正面、积极、生活化）
 
-- 流量池递进机制:
-  发布 → 200-500 曝光（初始池）
-  → 2 小时内 CES 达标 → 进入 1000-5000 池
-  → 继续达标 → 1 万 → 10 万 → 100 万
-  **发布后 2 小时是黄金期**——这段时间的互动决定生死
+## 四个流量口
+关注 / 发现 / 本地 / 搜索
+实际上只有两个重要：**发现页** + **搜索页**
 
-- 发布最佳时间:
-  工作日: 7:00-8:00 / 12:00-13:00 / 18:00-20:00 / 21:00-23:00
-  周末: 10:00-12:00 / 15:00-17:00 / 20:00-23:00
-  避开: 凌晨发帖（没有初始互动，直接死）
+### 发现页算法逻辑
+笔记发布后两条路：A违规 B收录（被搜索到）
+收录后的互动权重排名（口诀：**一关二评三点赞**）：
+  关注 > 评论=转发 > 点赞=收藏
+  1个关注 = 1个评论+1个转发
+  1个评论 = 1个点赞+1个收藏
 
-- 限流行为（绝对避免）:
-  ❌ 笔记中出现微信号/二维码/淘宝链接
-  ❌ 频繁修改已发布笔记（每次修改重新进入审核）
-  ❌ 搬运/重复内容
-  ❌ 明显硬广不挂报备标识
-  ❌ 一天发超过 2 篇（新号最多 1 篇/天）
-  ❌ 评论区导流（"私信我""看主页"）
+只要有人持续互动，平台持续推流，可以几个月甚至一年以上还有推荐。
+口号：**做爆一篇，吃上一年**
 
-## Content Creation Deep Guide
+### 搜索页算法逻辑
+搜索排序决定流量，位置不固定，实时变动。
+**关键词是核心中的核心！**
+官方说法：好标题更多赞。标题非常重要×3。
 
-### 封面设计（决定点击率的 70%）
-- **必须手机竖屏 3:4 比例**（1080×1440 或等比）
-- 大字报风格最稳: 3-5 个大字 + 辅助小字 + 简洁背景
-- 颜色: 高饱和度 > 低饱和度（在 feed 中更醒目）
-- 人脸出镜笔记点击率比纯产品图高 30-50%
-- 对比图效果好（Before/After, 我的 vs 竞品）
-- **绝不用左右分栏对比结构**（太模板化，没辨识度）
+关键词来源：
+1. 系统默认推荐（基于用户标签）
+2. 搜索热门（短期热搜词条）
+3. 联想关键词（用户输入自动补齐）
 
-### 标题套路（字符限制 20 字内）
-- 数字 + 痛点: "3 步搞定 XX 问题"
-- 身份标签: "设计师私藏的 XX"
-- 情绪词: "绝了/天花板/封神/后悔没早买"
-- 反问: "为什么没人告诉我 XX 这么好用？"
-- 悬念: "用了 XX 之后，再也回不去了"
+关键词选择原则：
+- 热搜是短期流量，关键词是长期流量
+- 选竞争小+流量大+匹配度高的词，不要泛词
+- 反推：如果你是用户，会搜什么词能找到你？
+- 合理布局，别硬堆（硬堆=广告=降权废号）
 
-### 正文结构（1000 字以内）
-1. 痛点引入（第一行抓人，不废话）
-2. 解决方案 / 使用体验
-3. 具体步骤 / 对比数据
-4. 总结推荐 + 互动引导（"你们觉得呢？"）
-- 多分段（每段 2-3 行）
-- 适度用 emoji 分隔（但不过度）
-- 关键词自然分布在标题+正文+标签中
+## 八级流量池（真实数据）
+一级 0-200：没违规就有，多篇看站内信
+二级 200-500：大部分账号的常态，如果长期→检查活跃度/垂直/原创/质量
+三级 500-2000：内容还行但互动率低，提高内容和互动
+**注：2000以下基本是AI机器人内容水平**
+四级 2000-2万：正常，新手容易达到的标准
+五级 2万-10万：自然流最后一关，过了就人工审核。要找到这个节奏感
+六级 10万-100万：门槛！系统判定营销号/标题党就不推了。做到10万=成功一半
+七级 100万-500万：人工干预，看内容+核心价值观+舆论风险
+八级 500万+：新手不用考虑
 
-### 关键词布局
-- 标题必须包含核心关键词
-- 正文前 100 字包含 1-2 次关键词
-- 标签 5-10 个: 2 个大词(>1000万笔记) + 3 个中词(10-1000万) + 3 个小词(<10万)
-- 用小红书搜索下拉词找长尾关键词
+**我们的目标：常态五级（2万+），够得着六级（10万+）**
 
-## 达人合作 SOP
-- 素人铺量（粉丝<1K）: ¥50-200/篇，用于制造"很多人在用"的氛围
-- KOC（1K-1万粉）: ¥200-1000/篇，真实体验感最强
-- 中腰部 KOL（1万-50万粉）: ¥1000-1万/篇，品效合一
-- 头部 KOL（50万+）: >¥1万/篇，适合品牌曝光而非直接转化
+## 养号七天法（一机一卡一号，禁频繁切换）
+Day 1：不改任何资料，不发内容，搜索行业关键词，认真刷30分钟×3次，真人活跃（关注点赞评论）
+Day 2：同Day 1，搜索行业关键词刷，不发内容
+Day 3：不用搜索，看发现页。一屏4-5篇中有3篇以上是行业内容=养号成功→修改资料→发第一篇干货
+Day 4-7：每天3篇左右干货分享，7天保证10篇干货
 
-选号核心指标:
-1. 互动率 > 2%（点赞+收藏+评论 / 粉丝数）
-2. 近 30 天发布频率 > 4 篇（活跃度）
-3. 粉丝画像与目标用户重合度 > 50%
-4. 近期无负面/争议（避免"塌房"博主）
-5. 广告笔记占比 < 30%（过多广告=粉丝信任度低）
+判定成功：
+- 发布第一篇就出"恭喜你XXX"提示
+- 发布后10分钟点薯条推广，能加热=账号正常
+- 能出恭喜=权重有保证，后续正常更新，推流越来越高
+
+**前七天千万不能发营销内容！第一篇绝不能违规！**
+
+## 内容创作实战
+
+### 封面（决定点击率70%）
+- 统一3:4竖屏
+- 封面要跟标题对得上
+- 封面加文字：把笔记内核放封面
+- 单篇至少三图以上
+- 要好看、简洁、有高级感
+- **没思路直接抄同行**
+
+### 标题（=武器，决定生死）
+标题逻辑：**话题+情绪**，20字左右，包含主题关键词
+标题跟封面、内容、选题四项要有关联
+
+标题套路：
+数字类："百分之九十的人都不知道XX这么简单" / "三招教你XX" / "十个做XX的网站"
+话题+提问："XX如何赚到一百万？" / "新手如何做XX？" / "一部手机能做XX吗？"
+矛盾反差："XX月入十万，但我辞职了" / "中专毕业凭什么能月入十万"
+反向法："天天吃肉也能减肥" / "不运动也能减肥"
+提问+方案："XX如何上手，一部手机就够了"
+猎奇心理："从年入百万到外卖骑手" / "一支可以当传家宝的手表"
+
+标题怎么找：**搜、蹭、学、抄**
+搜：全网搜索平台搜你的行业词，看自动弹出的后缀=用户关心的问题
+蹭：蹭热点，热点+自己的行业=爆（当天发，最迟半天内）
+学：用工具拉同行爆文，提关键字+同类词，直接照抄
+抄：同行写什么你就写什么，图片标题内容按自己习惯一比一复制
+
+### 内容
+- 前10篇必须优质，垃圾内容没用
+- 前7天不考虑引流、转化、营销
+- 不要原封不动偷图（100%识别），改图5分钟
+- 文案不要照抄（照抄是傻逼），专业内容可用AI转化，首尾按个人习惯口语化改写
+- 600字以上加分，800字最合适
+- **不要自己思考内容×3！同行已经给了验证过的答案，先抄再优化**
+
+## 人设模板（转化率核心）
+
+用户已经见号色变，专家号基本没转化率了。最高转化的两类：
+1. **同类人**：跟用户有一样困扰的人（"我也在减肥的姐妹"）
+2. **先行者**：已经做过这件事的人（"减肥成功的普通人"）
+
+ABC矩阵打法：
+A素人展示生活 + B提问 + C回答，但ABC都是你的号
+基于真实分享=信任度大大提升
+
+具体人设选择：
+- 意见领袖型：有专业性又有普适性（最佳，需技术积累）
+- 普通人记录生活：最容易拉近用户，信任度高，适合多账号
+- 品牌创始人：配合A种B收，专业背书增强信任
+
+## 发布节奏
+前三天一篇/天 → 七天内补到10篇 → 正式营销时15-21篇
+养号后一天一更即可，每篇间隔4小时以上
+发布后看是否能投流，前期不要关注浏览量×3
+
+## 权重算法
+账号权重：原创 + 垂直 + 内容质量 + 活跃度 + 等级
+笔记权重 > 账号权重（好内容普通号也能爆）
+关键词要有关联，宁少勿多勿乱
+
+## 违规红线
+- 一手机多账号频繁切换
+- 昵称/头像/个签出现联系方式
+- 搬运/非原创/刷数据/钓鱼分享
+- 不友善行为/敏感内容
+- 评论区留联系方式（包括暗示）
+- 一上来就发营销笔记
 
 ## 变现路径
-- 笔记 → 评论区/主页引导 → 私域（微信）→ 成交
-- 笔记 → 小红书店铺 → 直接成交
-- 笔记 → 品牌搜索 → 淘宝/京东成交（种草→搜索的经典路径）""",
+笔记 → 评论区/主页引导 → 私域（微信）→ 成交
+笔记 → 小红书店铺 → 直接成交
+笔记 → 品牌搜索 → 淘宝/京东成交（种草→搜索经典路径）
+导流方式很多，绝不能在公开区域留联系方式""",
         },
         {
             "name": "reddit_deep_knowledge",
-            "source": "CrabRes 2026 + ReplyAgent/OptaReach research + Reddit mod AMA analysis",
-            "description": "Reddit 平台深度运营知识（文化+算法+子版块+反封号）",
-            "framework": """=== REDDIT PLATFORM DEEP KNOWLEDGE ===
+            "source": "Karmic Reddit Organic Playbook 2025 + ReplyAgent/OptaReach research + Reddit Pro official guide",
+            "description": "Reddit 实战运营知识（Karma Ladder 四阶段 + CQS + 反封号 + 归因）",
+            "framework": """=== REDDIT PRACTITIONER-LEVEL KNOWLEDGE ===
+(Source: Karmic Reddit Organic Playbook + ReplyAgent + Reddit Pro official guide)
 
 ## Platform Culture (CRITICAL — violate this and you're dead)
 - Reddit is ANTI-MARKETING. Users actively hunt and downvote promotional content.
@@ -381,77 +485,93 @@ Bio link → Landing page with clear CTA → Email capture or signup
 - "10% rule": most subreddits expect <10% of your posts/comments to be self-promotional.
 - Authenticity is currency. "I built this" posts work. "Check out this amazing tool" posts die.
 
+## CQS: Contributor Quality Score (HIDDEN — critical to understand)
+Reddit has a HIDDEN account quality score that determines if your content gets shown:
+- Factors: email verified, 2FA enabled, interaction quality (comments > posts), 
+  content performance relative to community, behavior patterns (bot-like = penalized),
+  mod actions (posts deleted = severe CQS damage)
+- LOW CQS = posts auto-hidden or removed silently (you won't even know)
+- HIGH CQS = priority display, content shown more broadly
+- Building CQS takes weeks of genuine participation. Destroying it takes one spam post.
+
+## Product-Reddit-Fit Assessment (before investing time)
+Not every product belongs on Reddit. Score 0-10 on:
+1. Pre-purchase consideration: Do customers research heavily before buying? (SaaS=yes, impulse buy=no)
+2. Total addressable audience: Are there enough potential users? (mass market=yes, ultra-niche enterprise=no)
+3. Show vs Tell: Does your product need text explanation? (B2B software=tell=good fit, fashion=show=harder)
+
+Scoring: 8-10 = go all in. 5-7 = test in 2-3 subreddits. 0-4 = skip Reddit, just monitor.
+
+## Karma Ladder: 120-Day Four-Phase Strategy (from Karmic)
+
+### Phase 1: Foundation (Day 1-30) — BUILD LEGITIMACY
+Goal: pass Reddit's spam filters, build real karma
+- Account: use "brandname_yourname" format, verify email, enable 2FA
+- Day 1-2: ONLY browse. No likes, no comments. Let algorithm observe you.
+- Day 3-14: Join LOW-STAKES subreddits (r/AskReddit, r/CasualConversation)
+  Post 1-3 helpful comments/day. ZERO brand mentions.
+- Day 15-30: Gradually join TARGET subreddits (where your users hang out)
+  Continue commenting helpfully. Still NO brand mentions.
+- Target: 100+ karma, 30-day account age, zero violations
+
+### Phase 2: Authority (Day 31-90) — BECOME TRUSTED VOICE
+Goal: gain recognition in target communities
+- Post 1-3 comments/day in target subreddits
+- Directly answer questions, provide context, share experiences
+- GOLDEN RULE: never mention your brand/product/website
+- If someone asks for recommendations, reply "happy to share via DM"
+- Target: 250+ karma, 25+ karma in each of 1-3 target subreddits
+
+### Phase 3: Engagement (Day 91-120) — CREATE DISCUSSION
+Goal: post high-engagement topics that boost authority
+- Post "engagement topics": emotional triggers, hot takes, industry debates
+- Title must be compelling, body must invite discussion
+- Reply to every comment on your posts (boosts engagement metrics)
+- ABSOLUTELY NO self-promotion or sneaky link insertion
+- Target: at least 1 post per target subreddit with 25K+ views
+
+### Phase 4: Intent (Day 120+) — GENTLE PROMOTION
+Three types of promotional content (ONLY after phases 1-3):
+1. Adapted content: repurpose blog/LinkedIn posts into Reddit-native format. Remove brand jargon.
+2. Brand announcements: new features, funding, partnerships. GET MOD PERMISSION FIRST.
+3. AMA (Ask Me Anything): founder answers community questions. Best trust-builder. Often cited by AI engines.
+
 ## Algorithm & Ranking
-- Hot algorithm: score = upvotes - downvotes, weighted by recency (newer posts ranked higher)
-- First 10 upvotes matter as much as next 100 (logarithmic decay)
-- First 1-2 hours are critical — early downvotes can kill a post permanently
-- Comments also ranked: early comments with upvotes get "locked" at top
-- Google indexes Reddit heavily — top posts rank for years (long-tail traffic)
-- Reddit posts in Google results get steady traffic for 6-24 months
+- Hot algorithm: score = upvotes - downvotes, weighted by recency (logarithmic)
+- First 10 upvotes = same weight as next 100 (early momentum is everything)
+- First 1-2 hours critical — early downvotes kill a post permanently
+- Comments ranked similarly: early upvoted comments "lock" at top
+- Google indexes Reddit HEAVILY — top posts rank in search for 6-24 months
+- This is why replying to Google-ranking old posts = passive long-term traffic
 
-## Cold Start Strategy (new account)
-Day 1-7: Pure lurking and genuine commenting
-  - Subscribe to 10+ subreddits in your niche
-  - Comment helpfully on 5-10 posts per day (genuine advice, not generic)
-  - ZERO mention of any product
-  - Goal: reach 100+ karma
+## Content Formats Ranked
+1. "I did X. Here's what happened." (experience share) → highest trust
+2. "Guide: How to do X" (tutorial) → gets bookmarked, long Google shelf life
+3. "I analyzed X for Y days" (data/research) → upvoted for effort, often viral
+4. "AMA about X" → great if you have genuine expertise
+5. "I built X" (show & tell) → works in r/SideProject, r/startups
 
-Day 8-14: Value-first posting
-  - Post 1-2 valuable posts (tutorial, experience share, data analysis)
-  - Still no product mentions
-  - Engage deeply with every comment on your posts
+## Reply Strategy (often MORE effective than posting)
+- Find posts ALREADY ranking on Google for your keywords → reply with value + product mention
+  These get steady traffic for months. Your reply = passive leads forever.
+- Reply within 2 hours of new posts (early replies get top position)
+- Reply structure: 3-5 sentences genuine help + 1 sentence natural product mention
+- Never reply from alt accounts (Reddit detects cross-account patterns)
 
-Day 15+: Natural integration
-  - When someone asks for help with a problem your product solves:
-    → Write 3-5 sentences of genuine help FIRST
-    → Then: "I actually built a tool for this: [link]. Happy to give you free access."
-  - Post "Show HN" or "I built this" style posts in appropriate subreddits (r/SideProject, r/startups)
+## Anti-Ban Survival
+- Never same link to multiple subreddits simultaneously
+- Space self-promotional posts by 7+ days minimum
+- If post removed: DON'T repost. Message mods politely, ask why.
+- Vary content format and writing style between posts
+- Old account with history >> new account (CQS advantage)
+- One bad move can trigger shadowban (you post, nobody sees — check r/ShadowBan)
 
-## Subreddit Research Method
-For each target subreddit, research:
-1. Subscriber count and daily post volume
-2. Rules (especially about self-promotion) — read the FULL sidebar
-3. Top 10 posts of all time → what format/tone works
-4. Top 10 posts this month → what's currently trending
-5. Mod behavior → how strict, what gets removed
-6. Competitor presence → are competitors posting? How are they received?
-7. Best posting time → check top posts' timestamps
-
-## Content Formats Ranked by Effectiveness
-1. **"I did X. Here's what happened." (experience share)**
-   → Highest trust, people love real data and real stories
-2. **"Guide: How to do X" (tutorial)**
-   → Gets bookmarked, long shelf life in Google
-3. **"I analyzed X for Y days" (data/research)**
-   → Gets upvoted for effort, often goes viral
-4. **"AMA about X" (ask me anything)**
-   → Works well if you have genuine expertise
-5. **"I built X" (show & tell)**
-   → Works in r/SideProject, r/startups — be transparent about being the creator
-
-## Reply Strategy (often more effective than posting)
-- Find posts ranked on Google for keywords related to your product
-  → These get steady traffic for months
-  → A helpful reply with your product link = passive leads forever
-- Reply within 2 hours of a new post (early replies get top position)
-- Reply length: 3-5 sentences of genuine help + 1 sentence product mention
-- Never reply to your own post from alt accounts (Reddit detects this)
-
-## Anti-Ban Survival Guide
-- Never use the same account for multiple products
-- Never post the same link to multiple subreddits simultaneously
-- Space out self-promotional posts by at least 7 days
-- If a post gets removed, DON'T repost — message the mods and ask why
-- Vary your content format and writing style between posts
-- Use Reddit's native image/video hosting when possible (algorithm prefers it)
-- Old account with history >> New account (buy/build karma first)
-
-## Key Metrics
-- Upvote ratio (>90% = well-received, <60% = controversial/promotional)
-- Comment count per post (engagement depth)
-- Profile visits after posting (check in Reddit analytics)
-- UTM link clicks (actual traffic driven)
-- Google ranking of your posts (long-term value)""",
+## Result Attribution (the hard part)
+Reddit doesn't support clean UTM tracking. Use multi-signal approach:
+1. Reddit metrics: karma gained, post views, comment upvotes
+2. Holy grail: OTHER users mentioning your brand in threads you didn't participate in
+3. Website: reddit.com referral traffic + LLM referral traffic (ChatGPT/Perplexity citing your Reddit posts)
+4. Best attribution method: add "Where did you hear about us?" with "Reddit" option on signup form""",
         },
     ],
 
