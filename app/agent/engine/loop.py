@@ -545,28 +545,64 @@ The user came here because they're tired of generic advice. Show them what real 
         })
 
     def _get_available_actions(self) -> list[dict]:
-        """返回当前可用的 action schema（给 LLM 做 tool_use）"""
+        """返回当前可用的 action schema"""
         return [
             {
                 "name": "think",
-                "description": "内部推理，不输出给用户",
+                "description": "Internal reasoning, not shown to user",
                 "parameters": {"type": "object", "properties": {"reasoning": {"type": "string"}}}
             },
+            # 直接暴露研究工具（LLM 可以直接调用）
             {
-                "name": "call_tool",
-                "description": "调用研究/分析工具",
+                "name": "web_search",
+                "description": "Search the internet. Use for finding competitors, market data, trends, reviews.",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "tool_name": {"type": "string"},
-                        "tool_args": {"type": "object"},
-                        "reason": {"type": "string"},
-                    }
+                        "query": {"type": "string", "description": "Search query"},
+                        "num_results": {"type": "integer", "description": "Number of results (1-10)"},
+                    },
+                    "required": ["query"],
+                }
+            },
+            {
+                "name": "social_search",
+                "description": "Search Reddit, HackerNews, X, ProductHunt for discussions about a topic.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Topic to search"},
+                        "platforms": {"type": "array", "items": {"type": "string"}, "description": "Platforms: reddit, hackernews, x, producthunt"},
+                    },
+                    "required": ["query"],
+                }
+            },
+            {
+                "name": "scrape_website",
+                "description": "Fetch and extract content from a URL.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL to scrape"},
+                    },
+                    "required": ["url"],
+                }
+            },
+            {
+                "name": "competitor_analyze",
+                "description": "Deep analysis of a competitor (parallel: scrape site + search reviews + social mentions).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "competitor_url": {"type": "string", "description": "Competitor website URL"},
+                        "competitor_name": {"type": "string", "description": "Competitor name"},
+                    },
+                    "required": ["competitor_url"],
                 }
             },
             {
                 "name": "consult_expert",
-                "description": "调度专家 Agent 进行深度分析",
+                "description": "Consult a specialized expert for deep analysis.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -576,19 +612,20 @@ The user came here because they're tired of generic advice. Show them what real 
                             "ai_distribution", "psychologist", "product_growth",
                             "data_analyst", "copywriter", "critic", "designer"
                         ]},
-                        "task": {"type": "string"},
-                    }
+                        "task": {"type": "string", "description": "What to analyze"},
+                    },
+                    "required": ["expert_id", "task"],
                 }
             },
             {
                 "name": "ask_user",
-                "description": "向用户提问以获取必要信息",
-                "parameters": {"type": "object", "properties": {"question": {"type": "string"}}}
+                "description": "Ask the user a question to get information you need.",
+                "parameters": {"type": "object", "properties": {"question": {"type": "string"}}, "required": ["question"]}
             },
             {
                 "name": "output",
-                "description": "向用户输出最终结果/建议",
-                "parameters": {"type": "object", "properties": {"message": {"type": "string"}}}
+                "description": "Send the final response to the user. Use ONLY when you have enough research to give specific, actionable advice.",
+                "parameters": {"type": "object", "properties": {"message": {"type": "string"}}, "required": ["message"]}
             },
         ]
 
@@ -599,11 +636,14 @@ The user came here because they're tired of generic advice. Show them what real 
         if not isinstance(response, LLMResponse):
             return AgentAction(type=ActionType.OUTPUT, content=str(response))
 
+        logger.debug(f"Parse decision: content={response.content[:100] if response.content else 'empty'}, tool_calls={len(response.tool_calls)}")
+
         # 如果有 tool calls，解析第一个
         if response.tool_calls:
             tc = response.tool_calls[0]
             name = tc.get("name", "")
             args = tc.get("args", {})
+            logger.info(f"Tool call detected: {name}, args keys: {list(args.keys())}")
 
             if name == "think":
                 return AgentAction(
@@ -616,6 +656,14 @@ The user came here because they're tired of generic advice. Show them what real 
                     content=args.get("reason", "调用工具"),
                     tool_name=args.get("tool_name"),
                     tool_args=args.get("tool_args", {}),
+                )
+            elif name in ("web_search", "social_search", "scrape_website", "competitor_analyze", "deep_scrape"):
+                # DeepSeek 有时直接调用工具名而不走 call_tool 包装
+                return AgentAction(
+                    type=ActionType.TOOL_CALL,
+                    content=f"Using {name}",
+                    tool_name=name,
+                    tool_args=args,
                 )
             elif name == "consult_expert":
                 expert_id = args.get("expert_id", "")
