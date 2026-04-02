@@ -600,6 +600,33 @@ The user came here because they're tired of generic advice. Show them what real 
                     "required": ["competitor_url"],
                 }
             },
+            # 行动工具
+            {
+                "name": "write_post",
+                "description": "Write a ready-to-publish social media post for a specific platform (reddit, x, linkedin, etc).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "platform": {"type": "string", "description": "Platform: reddit, x, linkedin, hackernews, producthunt, xiaohongshu"},
+                        "topic": {"type": "string", "description": "Post topic"},
+                        "product_name": {"type": "string", "description": "Product to mention"},
+                    },
+                    "required": ["platform", "topic"],
+                }
+            },
+            {
+                "name": "write_email",
+                "description": "Write a personalized outreach email to influencers, partners, or potential users.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "recipient_type": {"type": "string", "description": "Who: influencer, partner, potential_user, press"},
+                        "context": {"type": "string", "description": "Why reaching out"},
+                        "recipient_name": {"type": "string", "description": "Name"},
+                    },
+                    "required": ["recipient_type", "context"],
+                }
+            },
             {
                 "name": "consult_expert",
                 "description": "Consult a specialized expert for deep analysis.",
@@ -657,8 +684,8 @@ The user came here because they're tired of generic advice. Show them what real 
                     tool_name=args.get("tool_name"),
                     tool_args=args.get("tool_args", {}),
                 )
-            elif name in ("web_search", "social_search", "scrape_website", "competitor_analyze", "deep_scrape"):
-                # DeepSeek 有时直接调用工具名而不走 call_tool 包装
+            elif name in ("web_search", "social_search", "scrape_website", "competitor_analyze", "deep_scrape", "write_post", "write_email", "submit_directory"):
+                # LLM 直接调用工具名
                 return AgentAction(
                     type=ActionType.TOOL_CALL,
                     content=f"Using {name}",

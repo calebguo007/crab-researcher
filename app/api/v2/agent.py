@@ -18,6 +18,7 @@ from app.agent.engine.llm_adapter import AgentLLM
 from app.agent.engine.loop import AgentLoop, LoopState
 from app.agent.tools import ToolRegistry
 from app.agent.tools.research import WebSearchTool, ScrapeWebsiteTool, SocialSearchTool, CompetitorAnalyzeTool, DeepScrapeTool
+from app.agent.tools.actions import WritePostTool, WriteEmailTool, SubmitToDirectoryTool
 from app.agent.experts import ExpertPool
 from app.agent.experts.market_researcher import MarketResearcher
 from app.agent.experts.economist import Economist
@@ -44,11 +45,16 @@ _sessions: dict[str, AgentLoop] = {}
 def _get_or_create_tools() -> ToolRegistry:
     """创建工具注册表"""
     registry = ToolRegistry()
+    # 研究工具
     registry.register(WebSearchTool())
     registry.register(ScrapeWebsiteTool())
     registry.register(SocialSearchTool())
     registry.register(CompetitorAnalyzeTool())
     registry.register(DeepScrapeTool())
+    # 行动工具
+    registry.register(WritePostTool())
+    registry.register(WriteEmailTool())
+    registry.register(SubmitToDirectoryTool())
     return registry
 
 
