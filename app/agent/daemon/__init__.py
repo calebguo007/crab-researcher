@@ -103,13 +103,40 @@ class GrowthDaemon:
 
         if self._discoveries:
             logger.info(f"Daemon found {len(self._discoveries)} discoveries")
-            # 写入日志
-            for d in self._discoveries:
+            for i, d in enumerate(self._discoveries):
+                # 用 LLM 分析发现并生成行动建议
+                self._discoveries[i] = await self._enrich_discovery(d, product)
                 await self.memory.append_journal({
                     "type": "daemon_discovery",
-                    "discovery": d,
+                    "discovery": self._discoveries[i],
                     "timestamp": time.time(),
                 })
+            # 通知用户
+            if self.notifier:
+                for d in self._discoveries:
+                    try:
+                        await self.notifier.send_discovery(d)
+                    except Exception as e:
+                        logger.error(f"Notification failed: {e}")
+
+    async def _enrich_discovery(self, discovery: dict, product: dict) -> dict:
+        """用 LLM 分析发现并生成行动建议"""
+        if not self.llm:
+            return discovery
+        from app.agent.engine.llm_adapter import TaskTier
+        product_name = product.get("name", product.get("raw_description", "")[:50])
+        try:
+            response = await self.llm.generate(
+                system_prompt="You are a concise growth strategist. Analyze discoveries and give ONE specific action in 2 sentences.",
+                messages=[{"role": "user", "content": f"Product: {product_name}\nDiscovery: {json.dumps(discovery, ensure_ascii=False, default=str)[:400]}\n\nWhat does this mean and what should we do RIGHT NOW?"}],
+                tier=TaskTier.PARSING,
+                max_tokens=150,
+            )
+            discovery["analysis"] = response.content
+            discovery["has_action"] = True
+        except Exception as e:
+            logger.warning(f"Discovery enrichment failed: {e}")
+        return discovery
 
     async def _scan_competitors(self, product: dict) -> list[dict]:
         """扫描竞品网站变化"""
@@ -259,15 +286,22 @@ class GrowthDaemon:
                             pass
         logger.info(f"Dream Gather: {len(recent_entries)} recent entries")
 
-        # Phase 3: Consolidate — 如果有 LLM，用它整理
+        # Phase 3: Consolidate + 效果复盘
         if self.llm and recent_entries:
             from app.agent.engine.llm_adapter import TaskTier
             try:
                 summary_input = json.dumps(recent_entries[:20], ensure_ascii=False, default=str)[:3000]
                 response = await self.llm.generate(
-                    system_prompt="You are a memory consolidation agent. Summarize the following growth journal entries into key facts, decisions, and insights. Remove duplicates and contradictions. Output structured bullet points.",
+                    system_prompt="""You are a growth analytics agent. Analyze the journal entries and produce:
+
+1. WHAT WORKED: Which actions drove results? (specific posts, emails, channels)
+2. WHAT DIDN'T: Which actions had no effect or negative effect?
+3. PATTERNS: What growth patterns are emerging? (best times, best channels, best content types)
+4. NEXT WEEK RULES: Based on the above, what 3 specific rules should guide next week's strategy?
+
+Be specific. Use data from the entries. Output as structured bullet points.""",
                     messages=[{"role": "user", "content": summary_input}],
-                    tier=TaskTier.PARSING,  # 用最便宜的模型
+                    tier=TaskTier.PARSING,
                     max_tokens=1024,
                 )
                 await self.memory.save("dream_summary", {
@@ -275,7 +309,12 @@ class GrowthDaemon:
                     "entries_processed": len(recent_entries),
                     "summary": response.content,
                 }, category="feedback")
-                logger.info("Dream Consolidate: done with LLM summary")
+                # 也保存为"增长规律"供 Coordinator 下次使用
+                await self.memory.save("growth_patterns", {
+                    "patterns": response.content,
+                    "updated_at": time.time(),
+                }, category="strategy")
+                logger.info("Dream Consolidate: done with effect review")
             except Exception as e:
                 logger.error(f"Dream Consolidate failed: {e}")
 

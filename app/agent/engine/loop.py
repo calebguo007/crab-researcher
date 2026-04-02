@@ -424,6 +424,7 @@ The user came here because they're tired of generic advice. Show them what real 
         strategy = await self.memory.load("strategy")
         results = await self.memory.load("results")
         brand_config = await self.memory.load("brand_config", category="product")
+        growth_patterns = await self.memory.load("growth_patterns", category="strategy")
 
         # 把用户消息加入消息历史
         if user_message:
@@ -445,6 +446,10 @@ The user came here because they're tired of generic advice. Show them what real 
             context_summary_parts.append(f"[Current strategy]: {json.dumps(strategy, ensure_ascii=False, default=str)[:500]}")
         if results:
             context_summary_parts.append(f"[Execution results]: {json.dumps(results, ensure_ascii=False, default=str)[:300]}")
+        if growth_patterns:
+            patterns_text = growth_patterns.get("patterns", "")
+            if patterns_text:
+                context_summary_parts.append(f"[Growth patterns learned from past actions]:\n{patterns_text[:500]}")
 
         # 消息列表：如果有上下文摘要，作为第一条 system reminder 注入
         messages = []

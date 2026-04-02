@@ -19,6 +19,9 @@ from app.api.v2 import share as share_v2
 from app.api.v2 import mcp as mcp_v2
 from app.api.v2 import skills as skills_v2
 from app.api.v2 import brand as brand_v2
+from app.api.v2 import creature as creature_v2
+from app.api.v2 import simulate as simulate_v2
+from app.api.v2 import execute as execute_v2
 from app.services.scheduler import MonitoringScheduler
 from app.agent.daemon import GrowthDaemon
 from app.agent.notifications import NotificationHub
@@ -102,6 +105,9 @@ app.include_router(share_v2.router, prefix=settings.API_PREFIX)
 app.include_router(mcp_v2.router, prefix=settings.API_PREFIX)
 app.include_router(skills_v2.router, prefix=settings.API_PREFIX)
 app.include_router(brand_v2.router, prefix=settings.API_PREFIX)
+app.include_router(creature_v2.router, prefix=settings.API_PREFIX)
+app.include_router(simulate_v2.router, prefix=settings.API_PREFIX)
+app.include_router(execute_v2.router, prefix=settings.API_PREFIX)
 
 
 @app.get("/", tags=["Root"])
