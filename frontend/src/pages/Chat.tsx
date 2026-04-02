@@ -8,8 +8,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { CreatureRenderer } from '../components/creature/CreatureRenderer'
+import { RoundtableSimulation } from '../components/ui/RoundtableSimulation'
 import type { CreatureState } from '../components/creature/types'
 import { api } from '../lib/api'
+import { EXPERTS } from '../lib/experts'
 
 interface ChatProps {
   creature: CreatureState
@@ -24,23 +26,6 @@ interface Message {
   timestamp: number
 }
 
-// 专家配置：名称 + 颜色 + emoji
-const EXPERTS: Record<string, { name: string; short: string; color: string; icon: string }> = {
-  market_researcher: { name: 'Market Researcher', short: 'Research', color: '#0EA5E9', icon: '🔍' },
-  economist: { name: 'Economist', short: 'Econ', color: '#10B981', icon: '💰' },
-  content_strategist: { name: 'Content Strategist', short: 'Content', color: '#8B5CF6', icon: '📝' },
-  social_media: { name: 'Social Media', short: 'Social', color: '#F43F5E', icon: '🎯' },
-  paid_ads: { name: 'Paid Ads', short: 'Ads', color: '#F59E0B', icon: '📢' },
-  partnerships: { name: 'Partnerships', short: 'Partners', color: '#EC4899', icon: '🤝' },
-  ai_distribution: { name: 'AI Distribution', short: 'AI Dist', color: '#6366F1', icon: '🤖' },
-  psychologist: { name: 'Psychologist', short: 'Psych', color: '#14B8A6', icon: '🧠' },
-  product_growth: { name: 'Product Growth', short: 'Growth', color: '#F97316', icon: '📈' },
-  data_analyst: { name: 'Data Analyst', short: 'Data', color: '#64748B', icon: '📊' },
-  copywriter: { name: 'Copywriter', short: 'Copy', color: '#A855F7', icon: '✍️' },
-  critic: { name: 'Strategy Critic', short: 'Critic', color: '#EF4444', icon: '⚖️' },
-  designer: { name: 'Designer', short: 'Design', color: '#06B6D4', icon: '🎨' },
-}
-
 export function Chat({ creature, onBack }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([{
     id: '0', role: 'assistant',
@@ -49,6 +34,7 @@ export function Chat({ creature, onBack }: ChatProps) {
   }])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [activeExpert, setActiveExpert] = useState<string | undefined>(undefined)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -71,16 +57,47 @@ export function Chat({ creature, onBack }: ChatProps) {
       })
       if (res.length > 0 && res[0].session_id) setSessionId(res[0].session_id)
 
-      const newMsgs: Message[] = res.map((r: any, i: number) => ({
-        id: `a-${Date.now()}-${i}`,
-        role: r.type === 'expert_thinking' ? 'expert' as const
-          : r.type === 'status' ? 'status' as const
-          : 'assistant' as const,
-        content: r.content,
-        expertId: r.expert_id || undefined,
-        timestamp: Date.now() + i,
-      }))
-      setMessages(prev => [...prev, ...newMsgs])
+      // 模拟圆桌讨论过程：逐步放出专家见解
+      for (let i = 0; i < res.length; i++) {
+        const r = res[i];
+        
+        // 处理专家思考状态：同步到可视化组件
+        if (r.type === 'expert_thinking') {
+          setActiveExpert(r.expert_id);
+          // 专家思考时的小停顿，增强真实感
+          if (r.content.includes('is analyzing')) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        } else {
+          setActiveExpert(undefined);
+        }
+
+        const newMsg: Message = {
+          id: `a-${Date.now()}-${i}`,
+          role: r.type === 'expert_thinking' ? 'expert' as const
+            : r.type === 'status' ? 'status' as const
+            : 'assistant' as const,
+          content: r.content,
+          expertId: r.expert_id || undefined,
+          timestamp: Date.now() + i,
+        };
+
+        // 如果已经有同一个专家的最终结论，就替换掉"正在分析"的中间状态
+        setMessages(prev => {
+          if (r.type === 'expert_thinking' && !r.content.includes('is analyzing')) {
+            const filtered = prev.filter(m => !(m.expertId === r.expert_id && m.content.includes('is analyzing')));
+            return [...filtered, newMsg];
+          }
+          return [...prev, newMsg];
+        });
+        
+        // 每个消息之间的呼吸感
+        if (i < res.length - 1) {
+          const delay = r.type === 'status' ? 200 : 400;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      setActiveExpert(undefined);
     } catch (e: any) {
       setMessages(prev => [...prev, {
         id: `e-${Date.now()}`, role: 'assistant',
@@ -132,6 +149,11 @@ export function Chat({ creature, onBack }: ChatProps) {
 
       {/* 消息区 — 群聊形态 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {/* 专家圆桌模拟可视化 */}
+        {(loading || activeExpert || messages.some(m => m.role === 'expert')) && (
+          <RoundtableSimulation activeExpertId={activeExpert} isSimulating={loading || !!activeExpert} />
+        )}
+
         {messages.map(msg => {
           // 用户消息
           if (msg.role === 'user') {
