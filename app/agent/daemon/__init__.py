@@ -93,6 +93,9 @@ class GrowthDaemon:
         # 3. 检查内容日历
         tasks.append(self._check_calendar())
 
+        # 4. 追踪已发布帖子的效果（action→result 闭环）
+        tasks.append(self._scan_action_results())
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         for result in results:
@@ -228,6 +231,93 @@ class GrowthDaemon:
                 })
 
         return discoveries
+
+    async def _scan_action_results(self) -> list[dict]:
+        """
+        追踪已发布帖子的效果 — action→result 闭环的核心
+        
+        扫描所有 status="posted" 的 action，抓取 metrics（likes/upvotes/comments）。
+        """
+        discoveries = []
+
+        try:
+            from app.agent.memory.experiments import ExperimentTracker
+            tracker = ExperimentTracker(base_dir=str(self.memory.base_dir))
+            trackable = await tracker.get_trackable_actions()
+
+            if not trackable:
+                return []
+
+            scraper = self.tools.get("scrape_website")
+            if not scraper:
+                return []
+
+            for action in trackable[:5]:  # 每次最多追踪 5 个
+                url = action.get("url", "")
+                platform = action.get("platform", "")
+                action_id = action.get("id", "")
+
+                if not url:
+                    continue
+
+                try:
+                    result = await scraper.execute(url=url)
+                    content = result.get("content_preview", "")
+                    metrics = self._extract_metrics(content, platform)
+
+                    if metrics:
+                        await tracker.record_result(
+                            action_id=action_id,
+                            metrics=metrics,
+                            raw_data={"scraped_length": result.get("content_length", 0)},
+                        )
+
+                        total_engagement = sum(metrics.values())
+                        if total_engagement > 50:
+                            discoveries.append({
+                                "type": "action_result",
+                                "title": f"Your {platform} post got {total_engagement} engagement!",
+                                "url": url,
+                                "metrics": metrics,
+                            })
+
+                        logger.info(f"Tracked action {action_id}: {metrics}")
+
+                except Exception as e:
+                    logger.debug(f"Failed to track action {action_id}: {e}")
+
+        except Exception as e:
+            logger.error(f"Action result scanning failed: {e}")
+
+        return discoveries
+
+    def _extract_metrics(self, content: str, platform: str) -> dict:
+        """从抓取的页面内容中启发式提取 metrics"""
+        import re
+        metrics = {}
+        if not content:
+            return metrics
+        content_lower = content.lower()
+
+        if platform == "reddit":
+            pts = re.search(r'(\d+)\s*(?:points?|upvotes?|score)', content_lower)
+            cmts = re.search(r'(\d+)\s*comments?', content_lower)
+            if pts: metrics["upvotes"] = int(pts.group(1))
+            if cmts: metrics["comments"] = int(cmts.group(1))
+        elif platform == "x":
+            lk = re.search(r'(\d+)\s*(?:likes?)', content_lower)
+            rt = re.search(r'(\d+)\s*(?:retweets?|reposts?)', content_lower)
+            rp = re.search(r'(\d+)\s*(?:replies?)', content_lower)
+            if lk: metrics["likes"] = int(lk.group(1))
+            if rt: metrics["retweets"] = int(rt.group(1))
+            if rp: metrics["replies"] = int(rp.group(1))
+        elif platform in ("linkedin", "hackernews"):
+            pts = re.search(r'(\d+)\s*(?:reactions?|likes?|points?)', content_lower)
+            cmts = re.search(r'(\d+)\s*comments?', content_lower)
+            if pts: metrics["likes" if platform == "linkedin" else "upvotes"] = int(pts.group(1))
+            if cmts: metrics["comments"] = int(cmts.group(1))
+
+        return metrics
 
     async def _midnight_boundary(self):
         """午夜边界：日报 + Growth Dream"""

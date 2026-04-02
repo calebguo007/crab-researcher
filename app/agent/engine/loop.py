@@ -120,6 +120,9 @@ class AgentLoop:
         # 自动提取和存储产品信息（如果用户消息包含产品描述）
         await self._maybe_save_product_info(user_message)
 
+        # 自动检测用户贴回的社媒链接并开始追踪
+        await self._maybe_track_posted_url(user_message)
+
         # 加载记忆上下文
         context = await self._build_context(user_message)
         context["trust"] = trust_permissions
@@ -599,6 +602,24 @@ Synthesize the expert findings into ONE clear, actionable response for the user.
             if patterns_text:
                 context_summary_parts.append(f"[Growth patterns learned from past actions]:\n{patterns_text[:500]}")
 
+        # 注入实验追踪数据和增长规律（action→result 闭环）
+        try:
+            from app.agent.memory.experiments import ExperimentTracker
+            tracker = ExperimentTracker(base_dir=str(self.memory.base_dir))
+            exp_summary = await tracker.get_summary()
+            if exp_summary.get("total_actions", 0) > 0:
+                context_summary_parts.append(
+                    f"[Experiment tracker]: {exp_summary['total_actions']} actions recorded, "
+                    f"{exp_summary['tracked_actions']} tracked, "
+                    f"{exp_summary['total_engagement']} total engagement, "
+                    f"{exp_summary['learnings_count']} learnings extracted"
+                )
+            learnings_text = await tracker.get_learnings_text()
+            if learnings_text:
+                context_summary_parts.append(learnings_text)
+        except Exception:
+            pass
+
         # 消息列表：如果有上下文摘要，作为第一条 system reminder 注入
         messages = []
         if context_summary_parts:
@@ -730,6 +751,49 @@ Synthesize the expert findings into ONE clear, actionable response for the user.
 
             await self.memory.save("product", existing)
             logger.info(f"Product info saved to memory (turn {self.state.turn_count})")
+
+    async def _maybe_track_posted_url(self, user_message: str):
+        """
+        如果用户消息包含社媒平台链接，自动创建 GrowthAction 记录并开始追踪。
+        
+        这是闭环的关键入口：用户发了帖子 → 贴回链接 → CrabRes 开始追踪效果。
+        """
+        import re
+        urls = re.findall(r'https?://\S+', user_message)
+        if not urls:
+            return
+
+        from app.agent.memory.experiments import ExperimentTracker
+        tracker = ExperimentTracker(base_dir=str(self.memory.base_dir))
+
+        for url in urls:
+            url_lower = url.lower().rstrip('.,;:!?)')
+            platform = ""
+            action_type = "post"
+
+            if "reddit.com" in url_lower:
+                platform = "reddit"
+                if "/comment/" in url_lower or "/comments/" in url_lower:
+                    action_type = "reply" if "/comment/" in url_lower else "post"
+            elif "x.com" in url_lower or "twitter.com" in url_lower:
+                platform = "x"
+            elif "linkedin.com" in url_lower:
+                platform = "linkedin"
+                if "/messaging/" in url_lower:
+                    action_type = "dm"
+            elif "news.ycombinator.com" in url_lower:
+                platform = "hackernews"
+            elif "producthunt.com" in url_lower:
+                platform = "producthunt"
+
+            if platform:
+                await tracker.record_action(
+                    platform=platform,
+                    action_type=action_type,
+                    url=url_lower,
+                    content_preview=user_message[:200],
+                )
+                logger.info(f"Auto-tracked posted URL: {platform}/{action_type} → {url_lower[:60]}")
 
     def _compact_context(self, context: dict) -> dict:
         """压缩上下文：截断旧的工具结果"""

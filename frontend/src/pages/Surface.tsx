@@ -22,19 +22,25 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
   const [discoveries, setDiscoveries] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
+  const [expSummary, setExpSummary] = useState<any>(null)
+  const [recentActions, setRecentActions] = useState<any[]>([])
 
   // 加载真实数据
   useEffect(() => {
     const load = async () => {
       try {
-        const [taskRes, discRes, statRes] = await Promise.all([
+        const [taskRes, discRes, statRes, expRes, actRes] = await Promise.all([
           api<any>('/growth/tasks').catch(() => ({ tasks: [] })),
           api<any>('/growth/discoveries').catch(() => ({ discoveries: [] })),
           api<any>('/growth/stats').catch(() => null),
+          api<any>('/growth/experiments/summary').catch(() => null),
+          api<any>('/growth/actions').catch(() => ({ actions: [] })),
         ])
         setTasks(taskRes.tasks || [])
         setDiscoveries(discRes.discoveries || [])
         if (statRes) setStats(statRes)
+        if (expRes) setExpSummary(expRes)
+        setRecentActions((actRes.actions || []).slice(-5).reverse())
       } catch {}
     }
     load()
@@ -143,6 +149,43 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
           )}
         </div>
       </div>
+
+      {/* 增长实验追踪 — action→result 闭环 */}
+      {(expSummary?.total_actions > 0 || recentActions.length > 0) && (
+        <div className="w-full mb-6">
+          <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3 font-heading flex items-center gap-2">
+            {creature.market === 'global' ? 'Growth Experiments' : '增长实验'}
+            {expSummary?.total_actions > 0 && (
+              <span className="text-[10px] font-mono text-brand bg-brand/10 px-2 py-0.5 rounded-full">
+                {expSummary.tracked_actions}/{expSummary.total_actions} tracked
+              </span>
+            )}
+          </h3>
+          <div className="space-y-2">
+            {recentActions.map((a: any, i: number) => (
+              <div key={a.id || i} className="flex items-stretch rounded-2xl bg-card border border-border overflow-hidden hover:border-accent/30 transition-all group">
+                <div className={`w-1 shrink-0 ${a.status === 'tracked' ? 'bg-emerald-500' : 'bg-accent'}`} />
+                <div className="flex items-center gap-3 p-3 flex-1 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-xs font-bold text-accent uppercase">
+                    {(a.platform || '?').slice(0, 2)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-primary truncate">{a.content_preview || a.url || 'Action recorded'}</p>
+                    <p className="text-[10px] text-muted font-mono">
+                      {a.platform} · {a.action_type} · {a.status === 'tracked' ? '✓ tracked' : '⏳ pending'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {recentActions.length === 0 && expSummary?.total_actions > 0 && (
+              <div className="text-center py-4 text-xs text-muted">
+                {expSummary.total_actions} actions recorded · {expSummary.learnings_count} learnings extracted
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 发现 */}
       <div className="w-full mb-8" id="discoveries-section">
