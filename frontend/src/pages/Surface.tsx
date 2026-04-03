@@ -1,14 +1,11 @@
 /**
  * Surface — CrabRes 主界面
- * 
- * 用户每天打开看到的第一个画面。
- * 极致 calm：螃蟹 + 3 个数字 + 今日任务 + 最新发现。
  */
 
 import { useState, useEffect } from 'react'
-import { CreatureRenderer } from '../components/creature/CreatureRenderer'
 import type { CreatureState } from '../components/creature/types'
 import { api } from '../lib/api'
+import { t, getLang } from '../lib/i18n'
 import { BellIcon, SettingsIcon, PenIcon, ChatIcon, ZapIcon, ShareIcon } from '../components/ui/Icons'
 import LogoImg from '../assets/CrabRes-LOGO.png'
 import PixImg from '../assets/pix_basic.png'
@@ -29,7 +26,6 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
   const [recentActions, setRecentActions] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // 加载真实数据
   useEffect(() => {
     const load = async () => {
       try {
@@ -71,12 +67,12 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         </div>
       </div>
 
-      {/* 生物体 — Pix */}
+      {/* Pix */}
       <div className="mb-2 animate-float">
         <img src={PixImg} alt="Pix" className="w-[140px] h-[140px] object-contain drop-shadow-lg" />
       </div>
 
-      {/* 分享按钮 */}
+      {/* 分享 */}
       <button
         onClick={async () => {
           try {
@@ -86,7 +82,7 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         }}
         className="text-xs text-muted hover:text-brand transition-colors mb-2 flex items-center gap-1"
       >
-        <ShareIcon /> Share your growth
+        <ShareIcon /> {t('surface.share')}
       </button>
 
       {/* 问候语 */}
@@ -94,27 +90,25 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         "{greeting}"
       </p>
 
-      {/* 3 个核心数字 — 有数据才显示 */}
+      {/* 3 个核心数字 */}
       {(stats?.growth_rate || stats?.total_users || stats?.streak_days || creature.totalUsers > 0) ? (
         <div className="flex items-center gap-6 mb-8">
-          <MetricCard value={`+${stats?.growth_rate ?? creature.growthRate}%`} label={creature.market === 'global' ? "growth" : "周增长"} />
-          <MetricCard value={`${stats?.total_users ?? creature.totalUsers}`} label={creature.market === 'global' ? "users" : "用户数"} />
-          <MetricCard value={`${stats?.streak_days ?? creature.streakDays}d`} label={creature.market === 'global' ? "streak" : "连续增长"} accent />
+          <MetricCard value={`+${stats?.growth_rate ?? creature.growthRate}%`} label={t('metric.growth')} />
+          <MetricCard value={`${stats?.total_users ?? creature.totalUsers}`} label={t('metric.users')} />
+          <MetricCard value={`${stats?.streak_days ?? creature.streakDays}d`} label={t('metric.streak')} accent />
         </div>
       ) : (
         <div className="mb-8 text-center">
-          <p className="text-sm text-secondary">
-            {creature.market === 'global' ? "Your growth journey starts with a conversation." : "你的增长之旅从一次对话开始。"}
-          </p>
+          <p className="text-sm text-secondary">{t('surface.empty')}</p>
         </div>
       )}
 
-      {/* 核心里程碑 / 活跃战役 */}
+      {/* 活跃战役 */}
       {(stats?.active_campaign_url || localStorage.getItem('crabres_active_tweet')) && (
         <div className="w-full mb-8 animate-fade-in">
           <h3 className="text-[10px] font-bold text-accent uppercase tracking-[0.2em] mb-3 flex items-center gap-2">
             <span className="w-1.5 h-1.5 bg-accent rounded-full animate-ping"></span>
-            {creature.market === 'global' ? 'Active Growth Campaign' : '当前增长战役'}
+            {t('surface.campaign')}
           </h3>
           <div className="card border-accent/20 bg-accent/5 p-4 flex items-center justify-between group hover:border-accent/40 transition-all">
             <div className="flex items-center gap-3">
@@ -132,7 +126,7 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
               rel="noopener noreferrer"
               className="text-[11px] font-bold text-accent px-4 py-2 rounded-xl border border-accent/20 hover:bg-accent hover:text-white transition-all shadow-sm"
             >
-              {creature.market === 'global' ? 'View Live' : '查看实时'} →
+              {t('surface.viewLive')} →
             </a>
           </div>
         </div>
@@ -141,36 +135,36 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
       {/* 今日任务 */}
       <div className="w-full mb-6">
         <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3 font-heading">
-          {creature.market === 'global' ? 'Today' : '今日待办'}
+          {t('surface.today')}
         </h3>
         <div className="space-y-2">
-          {tasks.length > 0 ? tasks.map((t: any, i: number) => (
+          {tasks.length > 0 ? tasks.map((tk: any, i: number) => (
             <TaskCard
-              key={t.id || i}
-              icon={t.type === 'chat' ? <ChatIcon /> : <PenIcon />}
-              title={t.title}
-              subtitle={t.subtitle || ''}
-              action={t.type === 'chat' ? (creature.market === 'global' ? 'Chat' : '开聊') : (creature.market === 'global' ? 'Do it' : '去执行')}
+              key={tk.id || i}
+              icon={tk.type === 'chat' ? <ChatIcon /> : <PenIcon />}
+              title={tk.title}
+              subtitle={tk.subtitle || ''}
+              action={tk.type === 'chat' ? t('action.chat') : t('action.do')}
               onAction={onChat}
             />
           )) : (
             <TaskCard icon={<ChatIcon />} 
-              title={creature.market === 'global' ? "Tell CrabRes about your product" : "告诉螃蟹你的产品细节"}
-              subtitle={creature.market === 'global' ? "Start a conversation to begin research" : "开始对话以启动深度调研"} 
-              action={creature.market === 'global' ? "Chat" : "开聊"}
+              title={t('surface.task.default')}
+              subtitle={t('surface.task.default.sub')} 
+              action={t('action.chat')}
               onAction={onChat} />
           )}
         </div>
       </div>
 
-      {/* 增长实验追踪 — action→result 闭环 */}
+      {/* 增长实验追踪 */}
       {(expSummary?.total_actions > 0 || recentActions.length > 0) && (
         <div className="w-full mb-6">
           <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3 font-heading flex items-center gap-2">
-            {creature.market === 'global' ? 'Growth Experiments' : '增长实验'}
+            {t('surface.experiments')}
             {expSummary?.total_actions > 0 && (
               <span className="text-[10px] font-mono text-brand bg-brand/10 px-2 py-0.5 rounded-full">
-                {expSummary.tracked_actions}/{expSummary.total_actions} tracked
+                {expSummary.tracked_actions}/{expSummary.total_actions} {t('common.tracked')}
               </span>
             )}
           </h3>
@@ -185,17 +179,12 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-primary truncate">{a.content_preview || a.url || 'Action recorded'}</p>
                     <p className="text-[10px] text-muted font-mono">
-                      {a.platform} · {a.action_type} · {a.status === 'tracked' ? '✓ tracked' : '⏳ pending'}
+                      {a.platform} · {a.action_type} · {a.status === 'tracked' ? `✓ ${t('common.tracked')}` : `⏳ ${t('common.pending')}`}
                     </p>
                   </div>
                 </div>
               </div>
             ))}
-            {recentActions.length === 0 && expSummary?.total_actions > 0 && (
-              <div className="text-center py-4 text-xs text-muted">
-                {expSummary.total_actions} actions recorded · {expSummary.learnings_count} learnings extracted
-              </div>
-            )}
           </div>
         </div>
       )}
@@ -203,40 +192,37 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
       {/* 发现 */}
       <div className="w-full mb-8" id="discoveries-section">
         <h3 className="text-xs font-medium text-muted uppercase tracking-wider mb-3">
-          {creature.market === 'global' ? 'Discoveries' : '最新发现'}
+          {t('surface.discoveries')}
         </h3>
         <div className="space-y-2">
           {discoveries.length > 0 ? discoveries.map((d, i) => (
             <DiscoveryCard
               key={i}
               title={d.title || d.change || d.competitor || 'New discovery'}
-              action={d.url ? (creature.market === 'global' ? 'View' : '查看') : (creature.market === 'global' ? 'Analyze' : '分析')}
+              action={d.url ? t('action.view') : t('action.analyze')}
               onAction={() => d.url ? window.open(d.url, '_blank') : onChat()}
             />
           )) : (
             <div className="text-center py-6 text-sm text-muted">
-              {creature.market === 'global' 
-                ? <>Your growth daemon is scanning...<br /><span className="text-xs">Discoveries will appear here.</span></>
-                : <>增长引擎正在全球扫描中...<br /><span className="text-xs">最新发现将显示在这里。</span></>}
+              {t('surface.scanning')}<br /><span className="text-xs">{t('surface.scanning.sub')}</span>
             </div>
           )}
         </div>
       </div>
 
-      {/* 底部入口 — 固定在底部 */}
+      {/* 底部入口 */}
       <div className="fixed bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-xl border-t border-border z-20">
         <div className="max-w-lg mx-auto flex gap-3 px-4 py-3">
           <button onClick={onChat}
             className="flex-1 py-3.5 rounded-xl bg-brand text-white text-sm font-heading font-semibold hover:bg-brand-hover transition-all shadow-md hover:shadow-lg">
-            {creature.market === 'global' ? 'Talk to CrabRes' : '与螃蟹对话'}
+            {t('surface.talk')}
           </button>
           <button onClick={onPlan}
             className="flex-1 py-3.5 rounded-xl card text-primary text-sm font-heading font-semibold hover:shadow-md transition-all">
-            {creature.market === 'global' ? 'Growth Plan' : '增长策略'}
+            {t('surface.plan')}
           </button>
         </div>
       </div>
-      {/* 底部占位（防止固定栏遮挡内容） */}
       <div className="h-20" />
     </div>
   )
@@ -295,10 +281,10 @@ function DiscoveryCard({ title, action, onAction }: { title: string; action: str
 
 function getGreeting(creature: CreatureState): string {
   const hour = new Date().getHours()
-  const market = creature.market || 'global'
+  const lang = getLang()
   
   const greetings = {
-    global: {
+    en: {
       morning: [
         `Good morning! ${creature.streakDays} days strong.`,
         `Rise and grind! Your competitors are already up.`,
@@ -313,28 +299,25 @@ function getGreeting(creature: CreatureState): string {
         `Good evening! Tomorrow's content is ready for you.`,
       ],
     },
-    domestic: {
+    zh: {
       morning: [
         `早安！已经连续增长 ${creature.streakDays} 天了。`,
         `别睡了，你的竞争对手已经在偷跑流量了。`,
-        `新的一天，去海外赚点美金回来。`,
+        `新的一天，冲！`,
       ],
       afternoon: [
         `简单播报下：发现 2 个值得注意的增长机会。`,
         `你的增长引擎运转良好，继续保持。`,
       ],
       evening: [
-        `复盘时间。今天全球市场发生了这些事。`,
-        `晚上好！明天的出海文案我已经帮你写好了。`,
+        `复盘时间。今天市场发生了这些事。`,
+        `晚上好！明天的内容我已经帮你准备好了。`,
       ],
     }
   }
 
   const period = hour < 12 ? 'morning' : hour < 18 ? 'afternoon' : 'evening'
-  const options = greetings[market][period]
-  // 用日期做种子让每天不一样
+  const options = greetings[lang][period]
   const dayHash = new Date().toDateString().split('').reduce((a, b) => a + b.charCodeAt(0), 0)
   return options[dayHash % options.length]
 }
-
-// Icons imported from ../components/ui/Icons

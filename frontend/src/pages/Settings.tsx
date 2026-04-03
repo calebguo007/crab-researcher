@@ -3,6 +3,7 @@
  */
 
 import { useState } from 'react'
+import { t } from '../lib/i18n'
 import { CreatureRenderer } from '../components/creature/CreatureRenderer'
 import type { CreatureState } from '../components/creature/types'
 import { SPECIES_CONFIG } from '../components/creature/types'
@@ -53,7 +54,7 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
         <button onClick={onBack} className="p-2 rounded-lg hover:bg-hover transition-colors">
           <ArrowIcon />
         </button>
-        <h1 className="font-heading font-semibold text-primary">Settings</h1>
+        <h1 className="font-heading font-semibold text-primary">{t('settings.title')}</h1>
       </div>
 
       <div className="px-5 py-6 space-y-6">
@@ -77,12 +78,12 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
 
         {/* 外观 */}
         <section className="animate-fade-in" style={{ animationDelay: '0.1s', opacity: 0 }}>
-          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">Appearance</h3>
+          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">{t('settings.appearance')}</h3>
           <div className="card overflow-hidden divide-y divide-[var(--border-default)]">
             <div className="flex items-center justify-between p-4">
               <div>
-                <p className="text-sm font-medium text-primary">Dark mode</p>
-                <p className="text-xs text-muted">Easier on the eyes at night</p>
+                <p className="text-sm font-medium text-primary">{t('settings.darkMode')}</p>
+                <p className="text-xs text-muted">{t('settings.darkMode.desc')}</p>
               </div>
               <button onClick={toggleDark}
                 className={`w-12 h-7 rounded-full transition-colors relative ${dark ? 'bg-brand' : 'bg-gray-200'}`}>
@@ -91,8 +92,8 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
             </div>
             <div className="flex items-center justify-between p-4">
               <div>
-                <p className="text-sm font-medium text-primary">Language</p>
-                <p className="text-xs text-muted">Agent responses & UI language</p>
+                <p className="text-sm font-medium text-primary">{t('settings.language')}</p>
+                <p className="text-xs text-muted">{t('settings.language.desc')}</p>
               </div>
               <div className="flex gap-1 p-0.5 rounded-lg bg-[var(--bg-subtle)]">
                 <button
@@ -112,7 +113,7 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
 
         {/* 通知 */}
         <section className="animate-fade-in" style={{ animationDelay: '0.2s', opacity: 0 }}>
-          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">Notifications</h3>
+          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">{t('settings.notifications')}</h3>
           <div className="card overflow-hidden divide-y divide-[var(--border-default)]">
             {[
               { key: 'email', label: 'Email digest', desc: 'Daily growth summary' },
@@ -137,7 +138,7 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
 
         {/* 项目 */}
         <section className="animate-fade-in" style={{ animationDelay: '0.3s', animationFillMode: 'forwards', opacity: 0 }}>
-          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">Projects</h3>
+          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">{t('settings.projects')}</h3>
           <div className="card p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center text-lg"
@@ -159,7 +160,7 @@ export function Settings({ creature, onBack, onLogout }: SettingsProps) {
 
         {/* 账户 */}
         <section className="animate-fade-in" style={{ animationDelay: '0.4s', animationFillMode: 'forwards', opacity: 0 }}>
-          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">Account</h3>
+          <h3 className="font-heading font-semibold text-sm text-muted uppercase tracking-wider mb-3">{t('settings.account')}</h3>
           <div className="card overflow-hidden divide-y divide-[var(--border-default)]">
             <button className="w-full p-4 text-left text-sm text-primary hover:bg-hover transition-colors"
               onClick={() => window.open('https://crabres.com/#pricing', '_blank')}>

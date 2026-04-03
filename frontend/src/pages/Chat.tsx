@@ -12,6 +12,7 @@ import ReactMarkdown from 'react-markdown'
 import { RoundtableSimulation } from '../components/ui/RoundtableSimulation'
 import { ArrowLeftIcon, SendIcon } from '../components/ui/Icons'
 import type { CreatureState } from '../components/creature/types'
+import { t } from '../lib/i18n'
 import { api } from '../lib/api'
 import { EXPERTS } from '../lib/experts'
 import PixImg from '../assets/pix_basic.png'
@@ -209,7 +210,7 @@ export function Chat({ creature, onBack }: ChatProps) {
           </div>
 
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-heading font-bold text-primary tracking-tight">Growth War Room</p>
+            <p className="text-sm font-heading font-bold text-primary tracking-tight">{t('chat.title')}</p>
             <p className="text-[10px] text-muted font-mono uppercase tracking-wider">
               {loading ? 'RESEARCHING...' :
                 expertCount > 0 ? `${expertCount} EXPERTS · ${statusCount} OPS` : 'STANDBY · 13 EXPERTS READY'}
