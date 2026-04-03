@@ -46,7 +46,6 @@ export function Chat({ creature, onBack }: ChatProps) {
   const [loading, setLoading] = useState(false)
   const [activeExpert, setActiveExpert] = useState<string | undefined>(undefined)
   const [sessionId, setSessionId] = useState<string | null>(() => localStorage.getItem(SESSION_KEY))
-  const [showRoundtable, setShowRoundtable] = useState(false)  // 默认隐藏圆桌，不迷惑新用户
   const [showAtMenu, setShowAtMenu] = useState(false)
   const [atFilter, setAtFilter] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -157,10 +156,11 @@ export function Chat({ creature, onBack }: ChatProps) {
   }
 
   const activeExperts = new Set(messages.filter(m => m.role === 'expert').map(m => m.expertId).filter(Boolean))
+  const hasExpertActivity = activeExperts.size > 0 || !!activeExpert
 
   return (
     <div className="h-screen flex flex-col bg-surface">
-      {/* ====== 头部 — 干净克制 ====== */}
+      {/* ====== 头部 ====== */}
       <div className="shrink-0 border-b border-border bg-surface z-20">
         <div className="max-w-4xl mx-auto flex items-center gap-3 px-5 py-3">
           <button onClick={onBack} className="p-2 -ml-2 rounded-lg hover:bg-hover transition-colors">
@@ -172,25 +172,34 @@ export function Chat({ creature, onBack }: ChatProps) {
             <div>
               <p className="text-sm font-semibold text-primary">{t('chat.title')}</p>
               <p className="text-[11px] text-muted">
-                {loading ? 'Researching...' : '13 experts ready'}
+                {activeExpert ? `${EXPERTS[activeExpert]?.name || 'Expert'} analyzing...`
+                  : loading ? 'Researching...'
+                  : activeExperts.size > 0 ? `${activeExperts.size} experts consulted`
+                  : '13 experts on standby'}
               </p>
             </div>
           </div>
 
-          <button
-            onClick={() => setShowRoundtable(!showRoundtable)}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${showRoundtable ? 'bg-brand/8 text-brand' : 'text-muted hover:bg-hover'}`}
-          >
-            Roundtable
-          </button>
+          {/* 专家头像群——只在有活动时出现 */}
+          {hasExpertActivity && (
+            <div className="hidden sm:flex -space-x-1.5 animate-fade-in">
+              {Array.from(activeExperts).slice(0, 5).map(eid => {
+                const expert = EXPERTS[eid || '']
+                return expert ? (
+                  <img key={eid} src={expert.avatar} alt={expert.short}
+                    className={`w-7 h-7 rounded-full border-2 border-[var(--bg-primary)] object-cover transition-all ${activeExpert === eid ? 'ring-2 ring-brand/50 scale-110' : ''}`} />
+                ) : null
+              })}
+            </div>
+          )}
         </div>
       </div>
 
       {/* ====== 主体 ====== */}
       <div className="flex-1 flex max-w-4xl mx-auto w-full min-h-0">
 
-        {/* 左栏：圆桌 */}
-        {showRoundtable && (
+        {/* 左栏：专家面板 — Progressive Disclosure: 只在有专家活动时自动出现 */}
+        {hasExpertActivity && (
           <div className="hidden sm:flex flex-col w-[280px] shrink-0 border-r border-border overflow-y-auto">
             <div className="flex-1 flex flex-col items-center justify-center px-3 py-4">
               <RoundtableSimulation activeExpertId={activeExpert} isSimulating={loading || !!activeExpert} />
