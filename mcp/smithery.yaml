@@ -1,9 +1,9 @@
-# CrabRes MCP Server Configuration for Smithery
+# CrabRes MCP Server — AI Growth Strategy Agent
 # https://smithery.ai
 
 name: crabres
-version: 1.0.0
-description: "AI Growth Strategy Agent — Research competitors, validate product direction, and create growth plans with ready-to-use content for any product."
+version: 2.0.0
+description: "Your AI CMO. Research real competitors by name, find where target users discuss your niche on Reddit/X/HN, and get actionable growth plans with ready-to-publish content. Not templates — personalized strategies based on live internet research. 13 expert agents (economist, psychologist, copywriter...) debate your strategy before delivery."
 vendor: CrabRes
 homepage: https://crabres.com
 repository: https://github.com/velmavalienteqejimu22-jpg/crab-researcher
@@ -14,19 +14,24 @@ transport:
 
 tools:
   - name: analyze_growth
-    description: "Analyze a product's growth potential. Researches competitors, finds target users, and suggests strategies."
+    description: "Full growth analysis: research competitors, find target users on Reddit/X/HN/XHS, calculate CAC/LTV, and create a 90-day growth plan with copy-paste content for each channel."
     
   - name: find_competitors
-    description: "Find and analyze competitors for a product or niche. Returns names, pricing, traffic sources."
+    description: "Find and deep-analyze competitors: pricing, features, traffic sources, social presence, user reviews. Returns actionable competitive intelligence, not generic lists."
     
   - name: find_target_users
-    description: "Find where target users hang out online. Searches Reddit, HN, X, ProductHunt for discussions."
+    description: "Discover exactly where target users discuss problems your product solves. Searches Reddit (specific subreddits with subscriber counts), HN, X, ProductHunt, LinkedIn, 小红书, 知乎."
+
+  - name: quick_advice
+    description: "Fast growth direction without deep search. Good for brainstorming. Returns top 3 channels + one uncomfortable truth about your market position."
 
 categories:
   - marketing
   - growth
   - research
   - strategy
+  - seo
+  - social-media
 
 tags:
   - growth-hacking
@@ -34,3 +39,8 @@ tags:
   - marketing-strategy
   - indie-hacker
   - startup
+  - reddit-marketing
+  - content-strategy
+  - seo
+  - user-research
+  - saas-growth

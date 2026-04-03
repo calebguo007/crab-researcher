@@ -107,11 +107,44 @@ class AgentLoop:
         
         这是整个系统的心跳。
         while(not_done): think → act → observe
+        
+        支持 @expert_id 私聊：用户可以 @economist 或 @psychologist 直接和专家对话
         """
         self._running = True
         self.state.turn_count += 1
         self.state.last_active_at = time.time()
         self.state.is_waiting_for_user = False
+
+        # 检测 @expert_id 私聊模式
+        import re
+        at_match = re.match(r'^@(\w+)\s+(.+)', user_message.strip(), re.DOTALL)
+        if at_match:
+            expert_id = at_match.group(1).lower()
+            expert_task = at_match.group(2).strip()
+            expert = self.experts.get(expert_id)
+            if expert:
+                # 直接和专家对话，跳过 Coordinator
+                yield {"type": "status", "content": f"Connecting you directly with {expert.name}..."}
+                yield {"type": "expert_thinking", "expert_id": expert_id, "content": f"{expert.name} is analyzing your question..."}
+
+                # 写前日志
+                await self._write_ahead_log(user_message)
+                self._message_history.append({"role": "user", "content": user_message})
+
+                # 构建上下文
+                context = await self._build_context(user_message)
+
+                # 直接调度专家
+                try:
+                    expert_output = await expert.analyze(context, expert_task)
+                    self._message_history.append({"role": "assistant", "content": f"[Expert: {expert_id}] {expert_output[:1500]}"})
+                    self.state.expert_outputs[expert_id] = expert_output
+                    yield {"type": "expert_thinking", "expert_id": expert_id, "content": expert_output}
+                except Exception as e:
+                    yield {"type": "error", "content": f"Expert {expert_id} encountered an error: {str(e)[:200]}"}
+
+                await self._persist_state()
+                return
 
         # 记录 Trust Level session
         await self.trust.record_session()
