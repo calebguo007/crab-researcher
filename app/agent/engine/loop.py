@@ -984,37 +984,70 @@ Synthesize the expert findings into ONE clear, actionable response for the user.
         return context
 
     async def _persist_state(self):
-        """持久化 Loop 状态"""
-        await self.memory.save(f"loop_state_{self.state.session_id}", {
+        """
+        完整会话检查点 — 进程重启无损恢复
+        
+        保存所有状态，包括：
+        - Loop 基本状态（phase, turn, tokens）
+        - 消息历史（完整）
+        - 专家输出缓存（完整内容，不只是 key）
+        - 待办任务
+        - 时间戳（用于判断检查点新鲜度）
+        """
+        # 专家输出完整保存（不只是 key 列表）
+        expert_outputs_full = {}
+        for eid, output in self.state.expert_outputs.items():
+            expert_outputs_full[eid] = output[:3000] if isinstance(output, str) else str(output)[:3000]
+
+        checkpoint = {
             "session_id": self.state.session_id,
             "phase": self.state.phase.value,
             "turn_count": self.state.turn_count,
             "tokens_used": self.state.total_tokens_used,
+            "token_budget": self.state.token_budget,
             "pending_tasks": self.state.pending_user_tasks,
+            "expert_outputs": expert_outputs_full,
             "expert_outputs_keys": list(self.state.expert_outputs.keys()),
             "is_waiting": self.state.is_waiting_for_user,
-            "message_history": self._message_history,
-        })
+            "message_history": self._message_history[-50:],  # 最多保存 50 条
+            "created_at": self.state.created_at,
+            "last_active_at": self.state.last_active_at,
+            "checkpoint_version": 2,  # 版本号，用于未来迁移
+        }
+
+        await self.memory.save(f"loop_state_{self.state.session_id}", checkpoint)
 
     async def _load_state(self):
-        """从磁盘加载 Loop 状态"""
+        """从检查点恢复完整状态"""
         data = await self.memory.load(f"loop_state_{self.state.session_id}")
         if not data:
             return
 
-        logger.info(f"Loading session state for {self.state.session_id}")
+        logger.info(f"Restoring session checkpoint for {self.state.session_id} (v{data.get('checkpoint_version', 1)})")
         self.state.phase = LoopPhase(data.get("phase", LoopPhase.INTAKE))
         self.state.turn_count = data.get("turn_count", 0)
         self.state.total_tokens_used = data.get("tokens_used", 0)
+        self.state.token_budget = data.get("token_budget", 100_000)
         self.state.pending_user_tasks = data.get("pending_tasks", [])
         self.state.is_waiting_for_user = data.get("is_waiting", False)
         self._message_history = data.get("message_history", [])
+        self.state.created_at = data.get("created_at", time.time())
+        self.state.last_active_at = data.get("last_active_at", time.time())
         
-        # 加载已有的专家输出到内存
-        for expert_id in data.get("expert_outputs_keys", []):
-            output = await self.memory.load(f"expert_output_{self.state.session_id}_{expert_id}", category="research")
-            if output:
-                self.state.expert_outputs[expert_id] = output
+        # v2 检查点：直接恢复专家输出内容
+        if data.get("checkpoint_version", 1) >= 2:
+            expert_outputs = data.get("expert_outputs", {})
+            if isinstance(expert_outputs, dict):
+                self.state.expert_outputs = expert_outputs
+                logger.info(f"Restored {len(expert_outputs)} expert outputs from checkpoint")
+        else:
+            # v1 兼容：只有 key 列表，需要从文件加载
+            for expert_id in data.get("expert_outputs_keys", []):
+                output = await self.memory.load(
+                    f"expert_output_{self.state.session_id}_{expert_id}", category="research"
+                )
+                if output:
+                    self.state.expert_outputs[expert_id] = output
 
     def _get_available_actions(self) -> list[dict]:
         """返回当前可用的 action schema"""

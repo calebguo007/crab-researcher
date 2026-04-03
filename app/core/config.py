@@ -70,6 +70,9 @@ class Settings(BaseSettings):
     MONTHLY_BUDGET_PER_USER: float = 100.0
     TOKEN_USAGE_ALERT_THRESHOLD: float = 0.8
 
+    # ========== MCP 客户端（调用外部 MCP 服务器）==========
+    MCP_SERVERS: str = ""  # 格式: name1:url1|name2:url2 或留空
+
     # ========== 爬虫安全白名单 ==========
     ALLOWED_SCRAPE_DOMAINS: List[str] = [
         "taobao.com", "tmall.com", "jd.com", "pdd.com", "1688.com",
