@@ -458,21 +458,55 @@ If this is the user's first message about their product:
 The user came here because they're tired of generic advice. Show them what real research looks like."""
 
     async def _execute_tool(self, action: AgentAction) -> Any:
-        """执行工具，带超时和错误处理"""
+        """执行工具，带超时、重试和结果验证"""
         tool = self.tools.get(action.tool_name)
         if not tool:
             return {"error": f"Tool {action.tool_name} not found"}
 
-        try:
-            result = await asyncio.wait_for(
-                tool.execute(**action.tool_args or {}),
-                timeout=60.0,
-            )
-            return result
-        except asyncio.TimeoutError:
-            return {"error": f"Tool {action.tool_name} timed out"}
-        except Exception as e:
-            return {"error": str(e)}
+        max_retries = 2
+        last_error = None
+
+        for attempt in range(max_retries):
+            try:
+                result = await asyncio.wait_for(
+                    tool.execute(**action.tool_args or {}),
+                    timeout=60.0,
+                )
+                
+                # 结果验证：检查是否为有效结果
+                if isinstance(result, dict):
+                    if result.get("error"):
+                        last_error = result["error"]
+                        if attempt < max_retries - 1:
+                            logger.warning(f"Tool {action.tool_name} returned error (attempt {attempt+1}): {last_error}")
+                            await asyncio.sleep(1)  # 短暂等待后重试
+                            continue
+                        return result
+                    # 验证搜索结果不为空
+                    if action.tool_name in ("web_search", "social_search"):
+                        if result.get("count", 0) == 0 and not result.get("answer"):
+                            logger.info(f"Tool {action.tool_name} returned empty results, attempt {attempt+1}")
+                            if attempt < max_retries - 1:
+                                await asyncio.sleep(1)
+                                continue
+                
+                return result
+                
+            except asyncio.TimeoutError:
+                last_error = f"Tool {action.tool_name} timed out"
+                logger.warning(f"{last_error} (attempt {attempt+1}/{max_retries})")
+                if attempt < max_retries - 1:
+                    continue
+                return {"error": last_error}
+            except Exception as e:
+                last_error = str(e)
+                logger.warning(f"Tool {action.tool_name} failed (attempt {attempt+1}): {last_error}")
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(1)
+                    continue
+                return {"error": last_error}
+
+        return {"error": last_error or "Unknown error after retries"}
 
     async def _consult_expert(self, action: AgentAction, context: dict) -> str:
         """调度专家 Agent"""
@@ -694,9 +728,56 @@ Synthesize the expert findings into ONE clear, actionable response for the user.
                 "content": "Understood, I have the context loaded.",
             })
 
-        # 加入消息历史（截取最近 20 条，避免超 token）
-        recent_history = self._message_history[-20:]
-        messages.extend(recent_history)
+        # 智能消息历史构建（不再无脑塞 20 条）
+        # 1. 过滤掉 status 消息（"Researching..."对 LLM 无用，浪费 token）
+        # 2. 截断工具结果（[Tool: xxx] 只保留前 500 字符）
+        # 3. 旧对话压缩（超过最近 8 轮的部分只保留 user/assistant 核心内容）
+        
+        filtered_history = []
+        for msg in self._message_history:
+            content = msg.get("content", "")
+            role = msg.get("role", "")
+            
+            # 跳过空消息
+            if not content.strip():
+                continue
+            
+            # 跳过 status 类消息（[Internal reasoning] 等对 Coordinator 有用但要截断）
+            if content.startswith("[Tool:"):
+                # 工具结果截断到 500 字符
+                filtered_history.append({**msg, "content": content[:500]})
+            elif content.startswith("[Internal reasoning]"):
+                # 内部推理截断到 200 字符
+                filtered_history.append({**msg, "content": content[:200]})
+            elif content.startswith("[Expert:"):
+                # 专家输出截断到 800 字符
+                filtered_history.append({**msg, "content": content[:800]})
+            else:
+                filtered_history.append(msg)
+        
+        # 保留最近 12 条完整消息（约 6 轮对话）
+        # 更早的消息只保留 user 和 assistant 的核心消息（跳过工具/专家）
+        if len(filtered_history) > 12:
+            old_msgs = filtered_history[:-12]
+            recent_msgs = filtered_history[-12:]
+            
+            # 旧消息只保留 user 和最终 assistant 回复
+            compressed_old = []
+            for m in old_msgs:
+                r = m.get("role", "")
+                c = m.get("content", "")
+                if r == "user":
+                    compressed_old.append({"role": "user", "content": c[:300]})
+                elif r == "assistant" and not c.startswith("["):
+                    compressed_old.append({"role": "assistant", "content": c[:500]})
+            
+            # 如果压缩后的旧消息太多，进一步截取
+            compressed_old = compressed_old[-6:]
+            
+            messages.extend(compressed_old)
+            messages.extend(recent_msgs)
+        else:
+            messages.extend(filtered_history)
 
         # 在最后追加语言提醒（紧贴用户最新消息之后，LLM 最容易遵循）
         if user_message:
