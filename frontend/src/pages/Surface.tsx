@@ -27,6 +27,7 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
   const [stats, setStats] = useState<any>(null)
   const [expSummary, setExpSummary] = useState<any>(null)
   const [recentActions, setRecentActions] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
   // 加载真实数据
   useEffect(() => {
@@ -45,6 +46,7 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         if (expRes) setExpSummary(expRes)
         setRecentActions((actRes.actions || []).slice(-5).reverse())
       } catch {}
+      setIsLoading(false)
     }
     load()
     const interval = setInterval(load, 60_000)
@@ -92,12 +94,20 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         "{greeting}"
       </p>
 
-      {/* 3 个核心数字 */}
-      <div className="flex items-center gap-6 mb-8">
-        <MetricCard value={`+${stats?.growth_rate ?? creature.growthRate}%`} label={creature.market === 'global' ? "growth" : "周增长"} />
-        <MetricCard value={`${stats?.total_users ?? creature.totalUsers}`} label={creature.market === 'global' ? "users" : "用户数"} />
-        <MetricCard value={`${stats?.streak_days ?? creature.streakDays}d`} label={creature.market === 'global' ? "streak" : "连续增长"} accent />
-      </div>
+      {/* 3 个核心数字 — 有数据才显示 */}
+      {(stats?.growth_rate || stats?.total_users || stats?.streak_days || creature.totalUsers > 0) ? (
+        <div className="flex items-center gap-6 mb-8">
+          <MetricCard value={`+${stats?.growth_rate ?? creature.growthRate}%`} label={creature.market === 'global' ? "growth" : "周增长"} />
+          <MetricCard value={`${stats?.total_users ?? creature.totalUsers}`} label={creature.market === 'global' ? "users" : "用户数"} />
+          <MetricCard value={`${stats?.streak_days ?? creature.streakDays}d`} label={creature.market === 'global' ? "streak" : "连续增长"} accent />
+        </div>
+      ) : (
+        <div className="mb-8 text-center">
+          <p className="text-sm text-secondary">
+            {creature.market === 'global' ? "Your growth journey starts with a conversation." : "你的增长之旅从一次对话开始。"}
+          </p>
+        </div>
+      )}
 
       {/* 核心里程碑 / 活跃战役 */}
       {(stats?.active_campaign_url || localStorage.getItem('crabres_active_tweet')) && (

@@ -114,38 +114,24 @@ async def agent_chat(
     req: ChatRequest,
     current_user: dict = Depends(get_current_user),
 ):
-    """
-    和 CrabRes Agent 对话
-    
-    第一次对话不需要 session_id，系统会创建新会话。
-    后续对话带上 session_id 继续同一个增长研究。
-    
-    返回一个列表，因为 Agent 一次对话可能产出多条消息（状态更新 + 最终回复）。
-    """
+    """非流式：等待全部完成后一次性返回。兼容旧前端。"""
     session_id = req.session_id or str(uuid.uuid4())
     user_id = current_user.get('user_id', 0)
 
-    # 清理过期会话
     _cleanup_expired_sessions()
 
-    # 用户隔离检查
     if session_id in _session_owners and _session_owners[session_id] != user_id:
         raise HTTPException(status_code=403, detail="Session does not belong to you")
 
-    # 获取或创建 Agent Loop
     if session_id not in _sessions:
         llm = AgentLLM()
         tools = _get_or_create_tools()
         experts = _get_or_create_experts()
         experts.set_llm(llm)
         memory = GrowthMemory(base_dir=f".crabres/memory/{user_id}")
-
         loop = AgentLoop(
-            session_id=session_id,
-            llm_service=llm,
-            tool_registry=tools,
-            expert_pool=experts,
-            memory=memory,
+            session_id=session_id, llm_service=llm,
+            tool_registry=tools, expert_pool=experts, memory=memory,
         )
         _sessions[session_id] = loop
         _session_owners[session_id] = user_id
@@ -153,7 +139,6 @@ async def agent_chat(
     loop = _sessions[session_id]
     _session_last_active[session_id] = __import__('time').time()
 
-    # 运行 Agent Loop，收集所有输出
     outputs: list[ChatResponse] = []
     async for event in loop.run(req.message):
         outputs.append(ChatResponse(
@@ -166,12 +151,71 @@ async def agent_chat(
 
     if not outputs:
         outputs.append(ChatResponse(
-            session_id=session_id,
-            type="message",
-            content="我正在思考你的增长策略，请稍等...",
+            session_id=session_id, type="message",
+            content="I'm thinking... please try again.",
         ))
 
     return outputs
+
+
+@router.post("/chat/stream")
+async def agent_chat_stream(
+    req: ChatRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    SSE 流式聊天 — 每个事件立即推送给前端
+    
+    前端用 EventSource 或 fetch + ReadableStream 接收。
+    每行格式: data: {"type":"status","content":"Researching...","session_id":"xxx"}
+    """
+    session_id = req.session_id or str(uuid.uuid4())
+    user_id = current_user.get('user_id', 0)
+
+    _cleanup_expired_sessions()
+
+    if session_id in _session_owners and _session_owners[session_id] != user_id:
+        raise HTTPException(status_code=403, detail="Session does not belong to you")
+
+    if session_id not in _sessions:
+        llm = AgentLLM()
+        tools = _get_or_create_tools()
+        experts = _get_or_create_experts()
+        experts.set_llm(llm)
+        memory = GrowthMemory(base_dir=f".crabres/memory/{user_id}")
+        loop = AgentLoop(
+            session_id=session_id, llm_service=llm,
+            tool_registry=tools, expert_pool=experts, memory=memory,
+        )
+        _sessions[session_id] = loop
+        _session_owners[session_id] = user_id
+
+    loop = _sessions[session_id]
+    _session_last_active[session_id] = __import__('time').time()
+
+    async def event_generator():
+        try:
+            async for event in loop.run(req.message):
+                data = json.dumps({
+                    "session_id": session_id,
+                    "type": event.get("type", "message"),
+                    "content": event.get("content", ""),
+                    "expert_id": event.get("expert_id"),
+                }, ensure_ascii=False)
+                yield f"data: {data}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)[:200], 'session_id': session_id})}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/session/{session_id}/status")

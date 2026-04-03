@@ -8,6 +8,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { RoundtableSimulation } from '../components/ui/RoundtableSimulation'
 import { ArrowLeftIcon, SendIcon } from '../components/ui/Icons'
 import type { CreatureState } from '../components/creature/types'
@@ -77,57 +78,106 @@ export function Chat({ creature, onBack }: ChatProps) {
     if (!input.trim() || loading) return
     const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', content: input.trim(), timestamp: Date.now() }
     setMessages(prev => [...prev, userMsg])
+    const msgText = input.trim()
     setInput('')
+    // 重置 textarea 高度
+    if (inputRef.current) inputRef.current.style.height = 'auto'
     setLoading(true)
 
     try {
-      const res = await api<any[]>('/agent/chat', {
+      // SSE 流式接收
+      const API = (import.meta as any).env?.VITE_API_BASE || '/api'
+      const token = localStorage.getItem('crabres_token') || ''
+      const response = await fetch(`${API}/agent/chat/stream`, {
         method: 'POST',
-        body: JSON.stringify({ message: userMsg.content, session_id: sessionId }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ message: msgText, session_id: sessionId }),
       })
-      if (res.length > 0 && res[0].session_id) setSessionId(res[0].session_id)
 
-      for (let i = 0; i < res.length; i++) {
-        const r = res[i]
-        if (r.type === 'expert_thinking') {
-          setActiveExpert(r.expert_id)
-          if (r.content.includes('is analyzing')) {
-            await new Promise(resolve => setTimeout(resolve, 800))
-          }
-        } else {
-          setActiveExpert(undefined)
-        }
+      if (!response.ok) {
+        throw new Error(`API Error ${response.status}`)
+      }
 
-        const newMsg: Message = {
-          id: `a-${Date.now()}-${i}`,
-          role: r.type === 'expert_thinking' ? 'expert' as const
-            : r.type === 'status' ? 'status' as const
-            : 'assistant' as const,
-          content: r.content,
-          expertId: r.expert_id || undefined,
-          timestamp: Date.now() + i,
-        }
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
 
-        setMessages(prev => {
-          if (r.type === 'expert_thinking' && !r.content.includes('is analyzing')) {
-            const filtered = prev.filter(m => !(m.expertId === r.expert_id && m.content.includes('is analyzing')))
-            return [...filtered, newMsg]
-          }
-          return [...prev, newMsg]
-        })
+      if (!reader) throw new Error('No response body')
 
-        if (i < res.length - 1) {
-          const delay = r.type === 'status' ? 150 : 300
-          await new Promise(resolve => setTimeout(resolve, delay))
+      let buffer = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // 保留不完整的行
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') continue
+
+          try {
+            const event = JSON.parse(data)
+            if (event.session_id && !sessionId) {
+              setSessionId(event.session_id)
+            }
+
+            if (event.type === 'expert_thinking') {
+              setActiveExpert(event.expert_id)
+            } else if (event.type === 'message' || event.type === 'question') {
+              setActiveExpert(undefined)
+            }
+
+            const newMsg: Message = {
+              id: `s-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              role: event.type === 'expert_thinking' ? 'expert' as const
+                : event.type === 'status' ? 'status' as const
+                : 'assistant' as const,
+              content: event.content || '',
+              expertId: event.expert_id || undefined,
+              timestamp: Date.now(),
+            }
+
+            setMessages(prev => {
+              // 替换"is analyzing"占位消息
+              if (event.type === 'expert_thinking' && !event.content?.includes('is analyzing')) {
+                return [...prev.filter(m => !(m.expertId === event.expert_id && m.content?.includes('is analyzing'))), newMsg]
+              }
+              return [...prev, newMsg]
+            })
+          } catch {}
         }
       }
       setActiveExpert(undefined)
     } catch (e: any) {
-      setMessages(prev => [...prev, {
-        id: `e-${Date.now()}`, role: 'assistant',
-        content: `Something went wrong: ${e.message}. Please try again.`,
-        timestamp: Date.now(),
-      }])
+      // 降级到非流式 API
+      try {
+        const res = await api<any[]>('/agent/chat', {
+          method: 'POST',
+          body: JSON.stringify({ message: msgText, session_id: sessionId }),
+        })
+        if (res.length > 0 && res[0].session_id) setSessionId(res[0].session_id)
+        for (const r of res) {
+          if (r.type === 'expert_thinking') setActiveExpert(r.expert_id)
+          else setActiveExpert(undefined)
+          setMessages(prev => [...prev, {
+            id: `f-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            role: r.type === 'expert_thinking' ? 'expert' as const : r.type === 'status' ? 'status' as const : 'assistant' as const,
+            content: r.content, expertId: r.expert_id || undefined, timestamp: Date.now(),
+          }])
+        }
+        setActiveExpert(undefined)
+      } catch (fallbackErr: any) {
+        setMessages(prev => [...prev, {
+          id: `e-${Date.now()}`, role: 'assistant',
+          content: `Connection failed: ${fallbackErr.message}. Please try again.`,
+          timestamp: Date.now(),
+        }])
+      }
     } finally {
       setLoading(false)
       inputRef.current?.focus()
@@ -233,8 +283,8 @@ export function Chat({ creature, onBack }: ChatProps) {
                     <img src={PixImg} alt="Pix" className="w-7 h-7 shrink-0 mt-0.5 rounded-full object-cover" />
                     <div className="max-w-[85%]">
                       <p className="text-[10px] font-heading font-semibold text-brand mb-1">CrabRes</p>
-                      <div className="px-4 py-3 rounded-2xl rounded-tl-sm card text-sm text-primary whitespace-pre-wrap leading-relaxed">
-                        {msg.content}
+                      <div className="px-4 py-3 rounded-2xl rounded-tl-sm card text-sm text-primary leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:mt-3 prose-headings:mb-1 prose-a:text-brand">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
                       </div>
                     </div>
                   </div>
@@ -253,11 +303,11 @@ export function Chat({ creature, onBack }: ChatProps) {
                       <p className="text-[10px] font-heading font-semibold mb-1" style={{ color: expert.color }}>
                         {expert.name}
                       </p>
-                      <div className="px-3.5 py-2.5 rounded-2xl rounded-tl-sm text-sm text-secondary leading-relaxed"
+                      <div className="px-3.5 py-2.5 rounded-2xl rounded-tl-sm text-sm text-secondary leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-a:text-brand"
                         style={{ background: expert.color + '06', border: `1px solid ${expert.color}12` }}>
                         {msg.content.length > 400 ? (
                           <CollapsibleText text={msg.content} maxLength={400} />
-                        ) : msg.content}
+                        ) : <ReactMarkdown>{msg.content}</ReactMarkdown>}
                       </div>
                     </div>
                   </div>
