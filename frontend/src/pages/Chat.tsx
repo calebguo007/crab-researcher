@@ -1,10 +1,8 @@
 /**
  * Chat — Growth War Room
  * 
- * 不是普通聊天。是增长作战室。
- * 左栏：专家圆桌可视化（桌面端）
- * 主区：群聊消息流（专家 + CrabRes + 用户）
- * 顶部：战术状态条（活跃专家、研究进度）
+ * UI 风格：Tavily 质感 — 暖白底、宽松间距、卡片式展示、克制的颜色
+ * 不是即时通讯泡泡，是专业增长工具的对话界面
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -34,7 +32,6 @@ const STORAGE_KEY = 'crabres_chat_messages'
 const SESSION_KEY = 'crabres_chat_session'
 
 export function Chat({ creature, onBack }: ChatProps) {
-  // 从 localStorage 恢复消息和 session
   const [messages, setMessages] = useState<Message[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -45,7 +42,7 @@ export function Chat({ creature, onBack }: ChatProps) {
     } catch {}
     return [{
       id: '0', role: 'assistant' as const,
-      content: "War Room active. Tell me about your product — I'll deploy the research team immediately.",
+      content: "Ready to research. Tell me about your product and growth goals.",
       timestamp: Date.now(),
     }]
   })
@@ -59,14 +56,11 @@ export function Chat({ creature, onBack }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // 持久化消息到 localStorage
   useEffect(() => {
-    // 只保存最近 100 条消息（避免 localStorage 爆）
     const toSave = messages.slice(-100)
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave)) } catch {}
   }, [messages])
 
-  // 持久化 sessionId
   useEffect(() => {
     if (sessionId) localStorage.setItem(SESSION_KEY, sessionId)
   }, [sessionId])
@@ -81,57 +75,41 @@ export function Chat({ creature, onBack }: ChatProps) {
     setMessages(prev => [...prev, userMsg])
     const msgText = input.trim()
     setInput('')
-    // 重置 textarea 高度
     if (inputRef.current) inputRef.current.style.height = 'auto'
     setLoading(true)
 
     try {
-      // SSE 流式接收
       const API = (import.meta as any).env?.VITE_API_BASE || '/api'
       const token = localStorage.getItem('crabres_token') || ''
       const response = await fetch(`${API}/agent/chat/stream`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ message: msgText, session_id: sessionId, language: localStorage.getItem('crabres_language') || 'en' }),
       })
 
-      if (!response.ok) {
-        throw new Error(`API Error ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`API Error ${response.status}`)
 
       const reader = response.body?.getReader()
       const decoder = new TextDecoder()
-
       if (!reader) throw new Error('No response body')
 
       let buffer = ''
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
-        buffer = lines.pop() || '' // 保留不完整的行
+        buffer = lines.pop() || ''
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6).trim()
           if (data === '[DONE]') continue
-
           try {
             const event = JSON.parse(data)
-            if (event.session_id && !sessionId) {
-              setSessionId(event.session_id)
-            }
-
-            if (event.type === 'expert_thinking') {
-              setActiveExpert(event.expert_id)
-            } else if (event.type === 'message' || event.type === 'question') {
-              setActiveExpert(undefined)
-            }
+            if (event.session_id && !sessionId) setSessionId(event.session_id)
+            if (event.type === 'expert_thinking') setActiveExpert(event.expert_id)
+            else if (event.type === 'message' || event.type === 'question') setActiveExpert(undefined)
 
             const newMsg: Message = {
               id: `s-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -142,9 +120,7 @@ export function Chat({ creature, onBack }: ChatProps) {
               expertId: event.expert_id || undefined,
               timestamp: Date.now(),
             }
-
             setMessages(prev => {
-              // 替换"is analyzing"占位消息
               if (event.type === 'expert_thinking' && !event.content?.includes('is analyzing')) {
                 return [...prev.filter(m => !(m.expertId === event.expert_id && m.content?.includes('is analyzing'))), newMsg]
               }
@@ -155,7 +131,6 @@ export function Chat({ creature, onBack }: ChatProps) {
       }
       setActiveExpert(undefined)
     } catch (e: any) {
-      // 降级到非流式 API
       try {
         const res = await api<any[]>('/agent/chat', {
           method: 'POST',
@@ -186,75 +161,57 @@ export function Chat({ creature, onBack }: ChatProps) {
   }
 
   const activeExperts = new Set(messages.filter(m => m.role === 'expert').map(m => m.expertId).filter(Boolean))
-  const statusCount = messages.filter(m => m.role === 'status').length
-  const expertCount = activeExperts.size
 
   return (
     <div className="h-screen flex flex-col bg-surface">
-      {/* ====== 头部状态条 — 固定顶部 ====== */}
-      <div className="shrink-0 border-b border-border bg-glass z-20">
-        <div className="max-w-5xl mx-auto flex items-center gap-3 px-4 py-2.5">
-          <button onClick={onBack} className="p-2 rounded-xl hover:bg-hover transition-colors" aria-label="Back">
+      {/* ====== 头部 — 干净克制 ====== */}
+      <div className="shrink-0 border-b border-border bg-surface z-20">
+        <div className="max-w-4xl mx-auto flex items-center gap-3 px-5 py-3">
+          <button onClick={onBack} className="p-2 -ml-2 rounded-lg hover:bg-hover transition-colors">
             <ArrowLeftIcon />
           </button>
 
-          <div className="flex -space-x-1.5">
-            <img src={PixImg} alt="Pix" className={`w-7 h-7 rounded-full object-cover border-2 border-white ${loading ? 'animate-pulse' : ''}`} />
-            {Array.from(activeExperts).slice(0, 5).map(eid => {
-              const expert = EXPERTS[eid || '']
-              return expert ? (
-                <img key={eid} src={expert.avatar} alt={expert.short}
-                  className="w-7 h-7 rounded-full border-2 border-white shadow-sm object-cover" />
-              ) : null
-            })}
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-heading font-bold text-primary tracking-tight">{t('chat.title')}</p>
-            <p className="text-[10px] text-muted font-mono uppercase tracking-wider">
-              {loading ? 'RESEARCHING...' :
-                expertCount > 0 ? `${expertCount} EXPERTS · ${statusCount} OPS` : 'STANDBY · 13 EXPERTS READY'}
-            </p>
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <img src={PixImg} alt="CrabRes" className="w-8 h-8 rounded-full object-cover" />
+            <div>
+              <p className="text-sm font-semibold text-primary">{t('chat.title')}</p>
+              <p className="text-[11px] text-muted">
+                {loading ? 'Researching...' : '13 experts ready'}
+              </p>
+            </div>
           </div>
 
           <button
             onClick={() => setShowRoundtable(!showRoundtable)}
-            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${showRoundtable ? 'bg-brand/10 text-brand border border-brand/20' : 'bg-hover text-muted border border-border'}`}
+            className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${showRoundtable ? 'bg-brand/8 text-brand' : 'text-muted hover:bg-hover'}`}
           >
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: showRoundtable ? 'var(--brand)' : 'var(--text-muted)' }} />
             Roundtable
           </button>
         </div>
       </div>
 
-      {/* ====== 主体 — 填满剩余高度 ====== */}
-      <div className="flex-1 flex max-w-5xl mx-auto w-full min-h-0">
+      {/* ====== 主体 ====== */}
+      <div className="flex-1 flex max-w-4xl mx-auto w-full min-h-0">
 
-        {/* 左栏：圆桌 — 固定不滚动 */}
+        {/* 左栏：圆桌 */}
         {showRoundtable && (
-          <div className="hidden sm:flex flex-col w-[300px] shrink-0 border-r border-border bg-surface overflow-y-auto">
+          <div className="hidden sm:flex flex-col w-[280px] shrink-0 border-r border-border overflow-y-auto">
             <div className="flex-1 flex flex-col items-center justify-center px-3 py-4">
               <RoundtableSimulation activeExpertId={activeExpert} isSimulating={loading || !!activeExpert} />
             </div>
-
-            {/* 专家列表 — 可点击 @ 私聊 */}
             <div className="shrink-0 border-t border-border px-2 py-2 space-y-0.5">
-              <p className="text-[9px] text-muted px-2 py-1 font-heading uppercase tracking-wider">Click to @ direct message</p>
+              <p className="text-[9px] text-muted px-2 py-1 uppercase tracking-wider">@ direct message</p>
               {Object.entries(EXPERTS).map(([key, expert]) => {
                 const isActive = activeExpert === key
                 const contributed = activeExperts.has(key)
                 return (
                   <button key={key}
-                    onClick={() => {
-                      setInput(`@${key} `)
-                      inputRef.current?.focus()
-                    }}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all text-left hover:bg-hover ${isActive ? 'bg-brand/8 border border-brand/15' : contributed ? 'opacity-90' : 'opacity-50 hover:opacity-80'}`}
+                    onClick={() => { setInput(`@${key} `); inputRef.current?.focus() }}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-all text-left hover:bg-hover ${isActive ? 'bg-brand/5' : contributed ? 'opacity-80' : 'opacity-40 hover:opacity-70'}`}
                   >
                     <img src={expert.avatar} alt={expert.short} className="w-5 h-5 rounded-full object-cover shrink-0" />
-                    <span className={`font-heading truncate ${isActive ? 'font-bold text-primary' : 'text-muted'}`}>{expert.short}</span>
+                    <span className={`truncate ${isActive ? 'font-medium text-primary' : 'text-muted'}`}>{expert.short}</span>
                     {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand animate-pulse shrink-0" />}
-                    {contributed && !isActive && <span className="ml-auto text-[9px] text-brand/60 shrink-0">✓</span>}
                   </button>
                 )
               })}
@@ -262,66 +219,69 @@ export function Chat({ creature, onBack }: ChatProps) {
           </div>
         )}
 
-        {/* 右栏：消息流 + 输入框 */}
+        {/* 右栏：内容 + 输入 */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
-          {/* 消息区 — 可滚动 */}
-          <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+          {/* 消息区 */}
+          <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
             {messages.map(msg => {
+
+              // ── 用户消息：右对齐，简洁 ──
               if (msg.role === 'user') {
                 return (
-                  <div key={msg.id} className="flex justify-end animate-fade-in">
-                    <div className="max-w-[80%] px-4 py-3 rounded-2xl rounded-br-sm bg-brand text-white text-sm shadow-sm">
+                  <div key={msg.id} className="flex justify-end">
+                    <div className="max-w-[75%] bg-brand text-white px-4 py-2.5 rounded-2xl rounded-br-md text-sm leading-relaxed">
                       {msg.content}
                     </div>
                   </div>
                 )
               }
 
+              // ── Agent 主回复：卡片式，Markdown 格式化 ──
               if (msg.role === 'assistant') {
                 return (
-                  <div key={msg.id} className="flex gap-2.5 animate-fade-in">
-                    <img src={PixImg} alt="Pix" className="w-7 h-7 shrink-0 mt-0.5 rounded-full object-cover" />
-                    <div className="max-w-[85%]">
-                      <p className="text-[10px] font-heading font-semibold text-brand mb-1">CrabRes</p>
-                      <div className="px-4 py-3 rounded-2xl rounded-tl-sm card text-sm text-primary leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-headings:mt-3 prose-headings:mb-1 prose-a:text-brand">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
+                  <div key={msg.id} className="animate-fade-in">
+                    <div className="flex items-center gap-2 mb-2">
+                      <img src={PixImg} alt="CrabRes" className="w-6 h-6 rounded-full object-cover" />
+                      <span className="text-xs font-medium text-brand">CrabRes</span>
+                      <span className="text-[10px] text-muted">{new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                    </div>
+                    <div className="crabres-prose ml-8">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
                   </div>
                 )
               }
 
+              // ── 专家分析：折叠卡片 ──
               if (msg.role === 'expert' && msg.expertId) {
                 const expert = EXPERTS[msg.expertId]
                 if (!expert) return null
-                return (
-                  <div key={msg.id} className="flex gap-2.5 animate-fade-in">
-                    <img src={expert.avatar} alt={expert.short}
-                      className="w-7 h-7 shrink-0 mt-0.5 rounded-full object-cover"
-                      style={{ border: `1.5px solid ${expert.color}40` }} />
-                    <div className="max-w-[85%]">
-                      <p className="text-[10px] font-heading font-semibold mb-1" style={{ color: expert.color }}>
-                        {expert.name}
-                      </p>
-                      <div className="px-3.5 py-2.5 rounded-2xl rounded-tl-sm text-sm text-secondary leading-relaxed prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5 prose-a:text-brand"
-                        style={{ background: expert.color + '06', border: `1px solid ${expert.color}12` }}>
-                        {msg.content.length > 400 ? (
-                          <CollapsibleText text={msg.content} maxLength={400} />
-                        ) : <ReactMarkdown>{msg.content}</ReactMarkdown>}
-                      </div>
+                const isShort = msg.content.includes('is analyzing')
+                if (isShort) {
+                  return (
+                    <div key={msg.id} className="ml-8 flex items-center gap-2 text-xs text-muted animate-fade-in">
+                      <img src={expert.avatar} alt={expert.short} className="w-4 h-4 rounded-full" />
+                      <span>{expert.name} analyzing...</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand/50 animate-pulse" />
                     </div>
-                  </div>
+                  )
+                }
+                return (
+                  <ExpertCard key={msg.id} expert={expert} content={msg.content} />
                 )
               }
 
+              // ── 状态消息：细线 ──
               if (msg.role === 'status') {
                 return (
-                  <div key={msg.id} className="flex justify-center animate-fade-in">
-                    <span className="text-[10px] text-muted bg-hover px-3 py-1 rounded-full flex items-center gap-1.5 font-mono uppercase tracking-wider">
-                      <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                  <div key={msg.id} className="flex items-center gap-3 ml-8 animate-fade-in">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-[10px] text-muted whitespace-nowrap flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-brand/60 animate-pulse" />
                       {msg.content}
                     </span>
+                    <div className="h-px flex-1 bg-border" />
                   </div>
                 )
               }
@@ -330,43 +290,32 @@ export function Chat({ creature, onBack }: ChatProps) {
             })}
 
             {loading && (
-              <div className="flex gap-2.5 animate-fade-in">
-                <img src={PixImg} alt="Pix" className="w-7 h-7 shrink-0 mt-0.5 rounded-full object-cover animate-pulse" />
-                <div className="px-4 py-3 rounded-2xl rounded-tl-sm card">
-                  <div className="flex items-center gap-2">
-                    <div className="flex gap-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand/50 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand/50 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-brand/50 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                    <span className="text-[10px] text-muted font-mono uppercase">Deploying experts...</span>
-                  </div>
+              <div className="ml-8 flex items-center gap-2 text-xs text-muted animate-fade-in">
+                <div className="flex gap-0.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand/40 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand/40 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-brand/40 animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
+                <span>Thinking...</span>
               </div>
             )}
 
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ====== 输入区 — 固定底部 ====== */}
-          <div className="shrink-0 px-4 py-3 border-t border-border bg-glass relative">
-            {/* @ 弹出菜单 */}
+          {/* ====== 输入区 ====== */}
+          <div className="shrink-0 px-5 py-3 border-t border-border relative">
             {showAtMenu && (
-              <div className="absolute bottom-full left-4 right-4 mb-1 card p-2 shadow-lg max-h-[300px] overflow-y-auto z-30">
-                <p className="text-[10px] text-muted px-2 py-1 font-heading uppercase">@ Direct Message an Expert</p>
+              <div className="absolute bottom-full left-5 right-5 mb-1 bg-[var(--bg-card)] border border-border rounded-xl p-2 shadow-lg max-h-[280px] overflow-y-auto z-30">
+                <p className="text-[10px] text-muted px-2 py-1 uppercase">@ Direct message</p>
                 {Object.entries(EXPERTS)
                   .filter(([key, ex]) => !atFilter || ex.name.toLowerCase().includes(atFilter.toLowerCase()) || key.includes(atFilter.toLowerCase()))
                   .map(([key, expert]) => (
                     <button key={key}
                       className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-hover transition-colors text-left"
-                      onClick={() => {
-                        setInput(`@${key} `)
-                        setShowAtMenu(false)
-                        setAtFilter('')
-                        inputRef.current?.focus()
-                      }}
+                      onClick={() => { setInput(`@${key} `); setShowAtMenu(false); setAtFilter(''); inputRef.current?.focus() }}
                     >
-                      <img src={expert.avatar} alt={expert.short} className="w-8 h-8 rounded-full object-cover" />
+                      <img src={expert.avatar} alt={expert.short} className="w-7 h-7 rounded-full object-cover" />
                       <div>
                         <p className="text-sm font-medium text-primary">{expert.name}</p>
                         <p className="text-[10px] text-muted">@{key}</p>
@@ -376,19 +325,17 @@ export function Chat({ creature, onBack }: ChatProps) {
                 }
               </div>
             )}
-            <div className="flex gap-2 items-end">
+            <div className="flex gap-2 items-end max-w-3xl mx-auto">
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={e => {
                   const val = e.target.value
                   setInput(val)
-                  // 自动扩展高度
                   if (inputRef.current) {
                     inputRef.current.style.height = 'auto'
                     inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + 'px'
                   }
-                  // 检测 @ 触发
                   if (val.endsWith('@') || (val.includes('@') && !val.includes(' '))) {
                     setShowAtMenu(true)
                     setAtFilter(val.split('@').pop() || '')
@@ -397,24 +344,18 @@ export function Chat({ creature, onBack }: ChatProps) {
                   }
                 }}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    setShowAtMenu(false)
-                    sendMessage()
-                  }
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); setShowAtMenu(false); sendMessage() }
                   if (e.key === 'Escape') setShowAtMenu(false)
                 }}
-                placeholder="Message... (type @ to DM an expert, Shift+Enter for new line)"
-                className="flex-1 !rounded-xl resize-none !py-2.5 !min-h-[40px] !max-h-[120px]"
+                placeholder="Describe your product or ask a growth question..."
+                className="flex-1 !rounded-xl resize-none !py-2.5 !min-h-[42px] !max-h-[120px] text-sm"
                 rows={1}
                 disabled={loading}
-                aria-label="Message input"
               />
               <button
                 onClick={() => { setShowAtMenu(false); sendMessage() }}
                 disabled={loading || !input.trim()}
-                className="btn-primary !px-4 !rounded-xl disabled:opacity-40"
-                aria-label="Send message"
+                className="btn-primary !px-4 !py-2.5 !rounded-xl disabled:opacity-30"
               >
                 <SendIcon />
               </button>
@@ -426,17 +367,38 @@ export function Chat({ creature, onBack }: ChatProps) {
   )
 }
 
-function CollapsibleText({ text, maxLength }: { text: string; maxLength: number }) {
+// ====== 专家卡片：可折叠 ======
+
+function ExpertCard({ expert, content }: { expert: { name: string; color: string; avatar: string; short: string }; content: string }) {
   const [expanded, setExpanded] = useState(false)
+  const isLong = content.length > 500
+
   return (
-    <>
-      {expanded ? text : text.slice(0, maxLength) + '...'}
-      <button onClick={() => setExpanded(!expanded)}
-        className="ml-1 text-brand text-xs hover:underline">
-        {expanded ? 'Show less' : 'Read more'}
+    <div className="ml-8 animate-fade-in">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 w-full text-left group"
+      >
+        <img src={expert.avatar} alt={expert.short} className="w-5 h-5 rounded-full shrink-0" />
+        <span className="text-xs font-medium" style={{ color: expert.color }}>{expert.name}</span>
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-[10px] text-muted group-hover:text-primary transition-colors">
+          {expanded ? 'Collapse' : 'Expand'}
+        </span>
       </button>
-    </>
+      {expanded && (
+        <div className="mt-2 pl-7 border-l-2 animate-fade-in" style={{ borderColor: expert.color + '30' }}>
+          <div className="crabres-prose text-secondary">
+            <ReactMarkdown>{isLong ? content : content}</ReactMarkdown>
+          </div>
+        </div>
+      )}
+      {!expanded && (
+        <p className="mt-1 pl-7 text-xs text-muted line-clamp-2 cursor-pointer hover:text-secondary transition-colors"
+           onClick={() => setExpanded(true)}>
+          {content.replace(/[#*_`]/g, '').slice(0, 150)}...
+        </p>
+      )}
+    </div>
   )
 }
-
-// SendIcon imported from Icons.tsx
