@@ -8,12 +8,12 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { CreatureRenderer } from '../components/creature/CreatureRenderer'
 import { RoundtableSimulation } from '../components/ui/RoundtableSimulation'
-import { ArrowLeftIcon } from '../components/ui/Icons'
+import { ArrowLeftIcon, SendIcon } from '../components/ui/Icons'
 import type { CreatureState } from '../components/creature/types'
 import { api } from '../lib/api'
 import { EXPERTS } from '../lib/experts'
+import PixImg from '../assets/pix_basic.png'
 
 interface ChatProps {
   creature: CreatureState
@@ -39,6 +39,8 @@ export function Chat({ creature, onBack }: ChatProps) {
   const [activeExpert, setActiveExpert] = useState<string | undefined>(undefined)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [showRoundtable, setShowRoundtable] = useState(true)
+  const [showAtMenu, setShowAtMenu] = useState(false)
+  const [atFilter, setAtFilter] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -122,7 +124,7 @@ export function Chat({ creature, onBack }: ChatProps) {
 
           {/* 生物体 + 专家头像群 */}
           <div className="flex -space-x-1.5">
-            <CreatureRenderer creature={{ ...creature, mood: loading ? 'thinking' : 'happy' }} size={28} animate={loading} />
+            <img src={PixImg} alt="Pix" className={`w-7 h-7 rounded-full object-cover border-2 border-white ${loading ? 'animate-pulse' : ''}`} />
             {Array.from(activeExperts).slice(0, 5).map(eid => {
               const expert = EXPERTS[eid || '']
               return expert ? (
@@ -192,9 +194,7 @@ export function Chat({ creature, onBack }: ChatProps) {
               if (msg.role === 'assistant') {
                 return (
                   <div key={msg.id} className="flex gap-2.5 animate-fade-in">
-                    <div className="w-7 h-7 shrink-0 mt-0.5">
-                      <CreatureRenderer creature={creature} size={28} animate={false} />
-                    </div>
+                    <img src={PixImg} alt="Pix" className="w-7 h-7 shrink-0 mt-0.5 rounded-full object-cover" />
                     <div className="max-w-[85%]">
                       <p className="text-[10px] font-heading font-semibold text-brand mb-1">CrabRes</p>
                       <div className="px-4 py-3 rounded-2xl rounded-tl-sm card text-sm text-primary whitespace-pre-wrap leading-relaxed">
@@ -244,9 +244,7 @@ export function Chat({ creature, onBack }: ChatProps) {
 
             {loading && (
               <div className="flex gap-2.5 animate-fade-in">
-                <div className="w-7 h-7 shrink-0 mt-0.5">
-                  <CreatureRenderer creature={{ ...creature, mood: 'thinking' }} size={28} />
-                </div>
+                <img src={PixImg} alt="Pix" className="w-7 h-7 shrink-0 mt-0.5 rounded-full object-cover animate-pulse" />
                 <div className="px-4 py-3 rounded-2xl rounded-tl-sm card">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
@@ -263,21 +261,63 @@ export function Chat({ creature, onBack }: ChatProps) {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ====== 输入区 ====== */}
-          <div className="px-4 py-3 border-t border-border bg-glass">
+          {/* ====== 输入区 + @专家选择器 ====== */}
+          <div className="px-4 py-3 border-t border-border bg-glass relative">
+            {/* @ 弹出菜单 */}
+            {showAtMenu && (
+              <div className="absolute bottom-full left-4 right-4 mb-1 card p-2 shadow-lg max-h-[300px] overflow-y-auto z-30">
+                <p className="text-[10px] text-muted px-2 py-1 font-heading uppercase">@ Direct Message an Expert</p>
+                {Object.entries(EXPERTS)
+                  .filter(([key, ex]) => !atFilter || ex.name.toLowerCase().includes(atFilter.toLowerCase()) || key.includes(atFilter.toLowerCase()))
+                  .map(([key, expert]) => (
+                    <button key={key}
+                      className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-hover transition-colors text-left"
+                      onClick={() => {
+                        setInput(`@${key} `)
+                        setShowAtMenu(false)
+                        setAtFilter('')
+                        inputRef.current?.focus()
+                      }}
+                    >
+                      <img src={expert.avatar} alt={expert.short} className="w-8 h-8 rounded-full object-cover" />
+                      <div>
+                        <p className="text-sm font-medium text-primary">{expert.name}</p>
+                        <p className="text-[10px] text-muted">@{key}</p>
+                      </div>
+                    </button>
+                  ))
+                }
+              </div>
+            )}
             <div className="flex gap-2">
               <input
                 ref={inputRef}
                 value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                placeholder="Describe your product, ask anything..."
+                onChange={e => {
+                  const val = e.target.value
+                  setInput(val)
+                  // 检测 @ 触发
+                  if (val.endsWith('@') || (val.includes('@') && !val.includes(' '))) {
+                    setShowAtMenu(true)
+                    setAtFilter(val.split('@').pop() || '')
+                  } else {
+                    setShowAtMenu(false)
+                  }
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    setShowAtMenu(false)
+                    sendMessage()
+                  }
+                  if (e.key === 'Escape') setShowAtMenu(false)
+                }}
+                placeholder="Message... (type @ to DM an expert)"
                 className="flex-1 !rounded-xl"
                 disabled={loading}
                 aria-label="Message input"
               />
               <button
-                onClick={sendMessage}
+                onClick={() => { setShowAtMenu(false); sendMessage() }}
                 disabled={loading || !input.trim()}
                 className="btn-primary !px-4 !rounded-xl disabled:opacity-40"
                 aria-label="Send message"
@@ -305,6 +345,4 @@ function CollapsibleText({ text, maxLength }: { text: string; maxLength: number 
   )
 }
 
-function SendIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-}
+// SendIcon imported from Icons.tsx

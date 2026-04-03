@@ -11,6 +11,7 @@ import type { CreatureState } from '../components/creature/types'
 import { api } from '../lib/api'
 import { BellIcon, SettingsIcon, PenIcon, ChatIcon, ZapIcon, ShareIcon } from '../components/ui/Icons'
 import LogoImg from '../assets/CrabRes-LOGO.png'
+import PixImg from '../assets/pix_basic.png'
 
 interface SurfaceProps {
   creature: CreatureState
@@ -68,9 +69,9 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         </div>
       </div>
 
-      {/* 生物体 */}
+      {/* 生物体 — Pix */}
       <div className="mb-2 animate-float">
-        <CreatureRenderer creature={creature} size={140} />
+        <img src={PixImg} alt="Pix" className="w-[140px] h-[140px] object-contain drop-shadow-lg" />
       </div>
 
       {/* 分享按钮 */}
@@ -212,17 +213,21 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         </div>
       </div>
 
-      {/* 底部入口 */}
-      <div className="w-full flex gap-3 mt-auto pt-4">
-        <button onClick={onChat}
-          className="flex-1 py-3.5 rounded-2xl bg-brand text-white text-sm font-heading font-semibold hover:bg-brand-hover transition-all shadow-md hover:shadow-lg">
-          {creature.market === 'global' ? 'Talk to CrabRes' : '与螃蟹对话'}
-        </button>
-        <button onClick={onPlan}
-          className="flex-1 py-3.5 rounded-2xl card text-primary text-sm font-heading font-semibold hover:shadow-md transition-all">
-          {creature.market === 'global' ? 'Growth Plan' : '增长策略'}
-        </button>
+      {/* 底部入口 — 固定在底部 */}
+      <div className="fixed bottom-0 left-0 right-0 bg-surface/80 backdrop-blur-xl border-t border-border z-20">
+        <div className="max-w-lg mx-auto flex gap-3 px-4 py-3">
+          <button onClick={onChat}
+            className="flex-1 py-3.5 rounded-xl bg-brand text-white text-sm font-heading font-semibold hover:bg-brand-hover transition-all shadow-md hover:shadow-lg">
+            {creature.market === 'global' ? 'Talk to CrabRes' : '与螃蟹对话'}
+          </button>
+          <button onClick={onPlan}
+            className="flex-1 py-3.5 rounded-xl card text-primary text-sm font-heading font-semibold hover:shadow-md transition-all">
+            {creature.market === 'global' ? 'Growth Plan' : '增长策略'}
+          </button>
+        </div>
       </div>
+      {/* 底部占位（防止固定栏遮挡内容） */}
+      <div className="h-20" />
     </div>
   )
 }

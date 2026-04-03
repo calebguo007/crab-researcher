@@ -7,6 +7,7 @@
  */
 
 import { EXPERTS } from '../../lib/experts'
+import PixImg from '../../assets/pix_basic.png'
 
 interface RoundtableSimulationProps {
   activeExpertId?: string
@@ -76,7 +77,7 @@ export function RoundtableSimulation({ activeExpertId, isSimulating }: Roundtabl
 
         {/* 中心 — CrabRes 指挥官 */}
         <circle cx={cx} cy={cy} r={innerR} fill="var(--bg-card)" stroke="var(--brand)" strokeWidth="2.5" />
-        <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="central" fontSize="18">🦀</text>
+        <image href={PixImg} x={cx - innerR + 4} y={cy - innerR + 4} width={(innerR - 4) * 2} height={(innerR - 4) * 2} clipPath={`circle(${innerR - 5}px at ${innerR - 4}px ${innerR - 4}px)`} />
         {isSimulating && (
           <circle cx={cx} cy={cy} r={innerR + 4} fill="none" stroke="var(--brand)" strokeWidth="1" opacity="0.3">
             <animate attributeName="r" values={`${innerR + 2};${innerR + 10};${innerR + 2}`} dur="1.5s" repeatCount="indefinite" />
@@ -113,13 +114,14 @@ export function RoundtableSimulation({ activeExpertId, isSimulating }: Roundtabl
                 style={{ transition: 'all 0.4s ease' }}
               />
 
-              {/* 专家 emoji */}
-              <text x={x} y={y + 1} textAnchor="middle" dominantBaseline="central"
-                fontSize={isActive ? 14 : 11}
+              {/* 专家头像 */}
+              <image href={expert.avatar} 
+                x={x - nodeR + 3} y={y - nodeR + 3} 
+                width={(nodeR - 3) * 2} height={(nodeR - 3) * 2}
+                clipPath={`circle(${nodeR - 4}px at ${nodeR - 3}px ${nodeR - 3}px)`}
                 opacity={dimmed ? 0.35 : 1}
-                style={{ transition: 'all 0.4s ease' }}>
-                {expert.icon}
-              </text>
+                style={{ transition: 'all 0.4s ease' }}
+              />
 
               {/* 活跃专家名称标签 */}
               {isActive && (
