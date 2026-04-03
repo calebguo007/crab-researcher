@@ -672,6 +672,16 @@ Synthesize the expert findings into ONE clear, actionable response for the user.
         except Exception:
             pass
 
+        # 注入 Growth State（渠道权重 + 历史表现 + 增长信号）
+        try:
+            from app.agent.memory.growth_log import GrowthLog
+            growth_log = GrowthLog(base_dir=str(self.memory.base_dir))
+            state_text = await growth_log.get_state_prompt()
+            if state_text:
+                context_summary_parts.append(state_text)
+        except Exception:
+            pass
+
         # 消息列表：如果有上下文摘要，作为第一条 system reminder 注入
         messages = []
         if context_summary_parts:
