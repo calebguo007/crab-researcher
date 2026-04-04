@@ -59,21 +59,28 @@ export function Landing({ onGetStarted, onLogin }: LandingProps) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
             {
+              icon: '◎',
               title: 'Researches first',
               desc: 'Finds your competitors, their traffic sources, and where your users hang out — before giving any advice.',
             },
             {
+              icon: '◉',
               title: '13 expert minds',
               desc: 'Economist, psychologist, copywriter, social media strategist — they debate YOUR strategy, not templates.',
             },
             {
+              icon: '✦',
               title: 'Writes everything',
               desc: 'Every Reddit post, outreach email, and content plan. Copy-paste ready. Personalized to your product.',
             },
           ].map((item, i) => (
-            <div key={i} className="p-5 rounded-xl border border-border bg-[var(--bg-card)] shadow-sm">
+            <div key={i} className="relative overflow-hidden p-5 rounded-xl border border-border shadow-sm"
+              style={{ background: 'linear-gradient(135deg, rgba(194,65,12,0.04) 0%, rgba(29,78,216,0.04) 100%)' }}>
+              <div className="text-2xl mb-3 opacity-60">{item.icon}</div>
               <h3 className="text-sm font-semibold text-primary mb-2">{item.title}</h3>
               <p className="text-sm text-secondary leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
             </div>
           ))}
         </div>
