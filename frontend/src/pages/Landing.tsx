@@ -1,6 +1,5 @@
 /**
- * Landing Page — Clean, warm, focused
- * Tavily-inspired: cream background, soft shadows, Inter font, no noise
+ * Landing Page — Warm, premium, focused
  */
 
 import PixFrontImg from '../assets/pix_fronted.png'
@@ -49,38 +48,24 @@ export function Landing({ onGetStarted, onLogin }: LandingProps) {
           </button>
           <button onClick={onLogin}
             className="text-sm text-secondary hover:text-primary transition-colors px-4 py-3">
-            I have an account →
+            I have an account &rarr;
           </button>
         </div>
       </section>
 
-      {/* What makes it different */}
+      {/* 3 differentiators — gradient cards with icons */}
       <section className="max-w-3xl mx-auto px-6 pb-20">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {[
-            {
-              icon: '◎',
-              title: 'Researches first',
-              desc: 'Finds your competitors, their traffic sources, and where your users hang out — before giving any advice.',
-            },
-            {
-              icon: '◉',
-              title: '13 expert minds',
-              desc: 'Economist, psychologist, copywriter, social media strategist — they debate YOUR strategy, not templates.',
-            },
-            {
-              icon: '✦',
-              title: 'Writes everything',
-              desc: 'Every Reddit post, outreach email, and content plan. Copy-paste ready. Personalized to your product.',
-            },
+            { icon: '◎', title: 'Researches first', desc: 'Finds your competitors, their traffic sources, and where your users hang out — before giving any advice.' },
+            { icon: '◉', title: '13 expert minds', desc: 'Economist, psychologist, copywriter, social media strategist — they debate YOUR strategy, not templates.' },
+            { icon: '✦', title: 'Writes everything', desc: 'Every Reddit post, outreach email, and content plan. Copy-paste ready. Personalized to your product.' },
           ].map((item, i) => (
             <div key={i} className="relative overflow-hidden p-5 rounded-xl border border-border shadow-sm"
-              style={{ background: 'linear-gradient(135deg, rgba(194,65,12,0.04) 0%, rgba(29,78,216,0.04) 100%)' }}>
-              <div className="text-2xl mb-3 opacity-60">{item.icon}</div>
+              style={{ background: 'linear-gradient(135deg, rgba(194,65,12,0.05) 0%, rgba(29,78,216,0.05) 100%)' }}>
+              <div className="text-2xl mb-3 text-gradient font-bold">{item.icon}</div>
               <h3 className="text-sm font-semibold text-primary mb-2">{item.title}</h3>
               <p className="text-sm text-secondary leading-relaxed">{item.desc}</p>
-            </div>
-          ))}
             </div>
           ))}
         </div>
@@ -95,9 +80,10 @@ export function Landing({ onGetStarted, onLogin }: LandingProps) {
             { step: '2', title: 'We research your market', desc: 'Real search data: competitor names, traffic numbers, Reddit discussions, pricing comparisons.' },
             { step: '3', title: 'Experts analyze & debate', desc: 'Market researcher, economist, social media expert — they argue about YOUR best strategy.' },
             { step: '4', title: 'Get your playbook', desc: 'Not "try Reddit." Instead: "Post in r/cscareerquestions Tuesday 9am with this exact title format."' },
-          ].map((item, i) => (
-            <div key={i} className="flex gap-4 items-start">
-              <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center text-sm font-bold text-brand shrink-0 mt-0.5">
+          ].map((item) => (
+            <div key={item.step} className="flex gap-4 items-start">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 mt-0.5"
+                style={{ background: 'linear-gradient(135deg, var(--brand) 0%, var(--accent) 100%)' }}>
                 {item.step}
               </div>
               <div>
@@ -117,7 +103,7 @@ export function Landing({ onGetStarted, onLogin }: LandingProps) {
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           {Object.entries(EXPERTS).map(([key, expert]) => (
-            <div key={key} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-[var(--bg-card)] shadow-sm">
+            <div key={key} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-[var(--bg-card)] shadow-sm hover:shadow-md transition-shadow">
               <img src={expert.avatar} alt={expert.short} className="w-6 h-6 rounded-full object-cover" />
               <span className="text-xs font-medium text-primary">{expert.short}</span>
             </div>
@@ -125,17 +111,20 @@ export function Landing({ onGetStarted, onLogin }: LandingProps) {
         </div>
       </section>
 
-      {/* Not another ChatGPT wrapper */}
+      {/* Comparison */}
       <section className="max-w-2xl mx-auto px-6 pb-20">
-        <div className="p-6 rounded-xl border border-border bg-[var(--bg-card)] shadow-sm">
-          <h3 className="text-base font-semibold text-primary mb-3">Not another ChatGPT wrapper</h3>
-          <div className="space-y-3 text-sm text-secondary leading-relaxed">
-            <p>
-              <span className="text-muted">ChatGPT:</span> "You should try Reddit marketing and consider SEO for long-term growth."
-            </p>
-            <p>
-              <span className="text-brand font-medium">CrabRes:</span> "Your top competitor <strong>Teal.com</strong> gets 4.8M visits/month, 72% from SEO. Reddit <strong>r/resumes</strong> (850K members) has 12 threads asking for AI resume tools this month. Here's your first post, ready to copy-paste."
-            </p>
+        <div className="p-6 rounded-xl border border-border shadow-sm"
+          style={{ background: 'linear-gradient(135deg, rgba(194,65,12,0.03) 0%, rgba(29,78,216,0.03) 100%)' }}>
+          <h3 className="text-base font-semibold text-primary mb-4">Not another ChatGPT wrapper</h3>
+          <div className="space-y-4 text-sm leading-relaxed">
+            <div className="p-3 rounded-lg bg-[var(--bg-subtle)]">
+              <span className="text-muted text-xs uppercase tracking-wider">ChatGPT</span>
+              <p className="text-secondary mt-1">"You should try Reddit marketing and consider SEO for long-term growth."</p>
+            </div>
+            <div className="p-3 rounded-lg border border-brand/20 bg-brand/3">
+              <span className="text-brand text-xs uppercase tracking-wider font-medium">CrabRes</span>
+              <p className="text-primary mt-1">"Your top competitor <strong>Teal.com</strong> gets 4.8M visits/month, 72% from SEO. Reddit <strong>r/resumes</strong> (850K members) has 12 threads asking for AI resume tools this month. Here's your first post, ready to copy-paste."</p>
+            </div>
           </div>
         </div>
       </section>
