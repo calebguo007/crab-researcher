@@ -12,28 +12,28 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  /* 色板 — 暖色 (Tavily-inspired) */
-  --bg-primary: #FEFCF8;
-  --bg-secondary: #F7F4EE;
-  --bg-card: rgba(255, 253, 248, 0.85);
-  --bg-card-hover: rgba(255, 253, 248, 0.95);
+  /* 色板 — 暖色但不黄 */
+  --bg-primary: #FDFBF7;
+  --bg-secondary: #F5F3EF;
+  --bg-card: rgba(255, 252, 247, 0.88);
+  --bg-card-hover: rgba(255, 252, 247, 0.96);
   --bg-subtle: rgba(0, 0, 0, 0.03);
 
   --text-primary: #1A1A1A;
-  --text-secondary: #555555;
-  --text-muted: #999999;
+  --text-secondary: #4A4A4A;
+  --text-muted: #8A8A8A;
   --text-inverted: #FFFFFF;
 
-  --border-default: rgba(0, 0, 0, 0.08);
-  --border-hover: rgba(0, 0, 0, 0.15);
+  --border-default: rgba(0, 0, 0, 0.07);
+  --border-hover: rgba(0, 0, 0, 0.14);
 
-  --brand: #D97706;
-  --brand-hover: #B45309;
-  --brand-light: rgba(217, 119, 6, 0.08);
-  --brand-glow: rgba(217, 119, 6, 0.10);
+  --brand: #C2410C;
+  --brand-hover: #9A3412;
+  --brand-light: rgba(194, 65, 12, 0.06);
+  --brand-glow: rgba(194, 65, 12, 0.08);
 
-  --accent: #2563EB;
-  --accent-light: rgba(37, 99, 235, 0.08);
+  --accent: #1D4ED8;
+  --accent-light: rgba(29, 78, 216, 0.06);
 
   --success: #059669;
   --warning: #D97706;
@@ -70,8 +70,8 @@
   --text-inverted: #1C1917;
   --border-default: rgba(255, 255, 255, 0.08);
   --border-hover: rgba(255, 255, 255, 0.15);
-  --brand-light: rgba(217, 119, 6, 0.15);
-  --brand-glow: rgba(217, 119, 6, 0.15);
+  --brand-light: rgba(194, 65, 12, 0.12);
+  --brand-glow: rgba(194, 65, 12, 0.12);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.4);
   --shadow-lg: 0 12px 40px rgba(0,0,0,0.5);
@@ -181,8 +181,8 @@ h1, h2, h3, h4, h5, h6 {
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 
-    0 4px 14px rgba(217, 119, 6, 0.25),
-    0 0 30px rgba(217, 119, 6, 0.08);
+    0 4px 14px rgba(194, 65, 12, 0.2),
+    0 0 30px rgba(194, 65, 12, 0.06);
 }
 
 .btn-primary:active {

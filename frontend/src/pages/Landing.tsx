@@ -34,20 +34,24 @@ export function Landing({ onGetStarted, onLogin }: LandingProps) {
 
         <h1 className="text-4xl sm:text-5xl font-bold text-primary tracking-tight leading-[1.15] mb-5">
           You build it.<br />
-          <span className="text-brand">We grow it.</span>
+          <span className="text-gradient">We grow it.</span>
         </h1>
 
         <p className="text-lg text-secondary max-w-lg mx-auto mb-8 leading-relaxed">
-          The AI growth agent that researches your market, analyzes competitors by name,
-          and creates a playbook you can execute — not generic advice.
+          Not templates. Not generic advice. CrabRes researches <em>your</em> market,
+          finds <em>your</em> competitors by name, and tells you exactly what to post, where, and when.
         </p>
 
-        <button onClick={onGetStarted}
-          className="text-base font-medium text-white bg-brand hover:bg-brand-hover px-8 py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg">
-          Start free — no credit card
-        </button>
-
-        <p className="text-xs text-muted mt-4">Free tier available. No credit card required.</p>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button onClick={onGetStarted}
+            className="text-base font-medium text-white bg-brand hover:bg-brand-hover px-8 py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg">
+            Start free — no credit card
+          </button>
+          <button onClick={onLogin}
+            className="text-sm text-secondary hover:text-primary transition-colors px-4 py-3">
+            I have an account →
+          </button>
+        </div>
       </section>
 
       {/* What makes it different */}
