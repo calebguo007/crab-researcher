@@ -119,7 +119,22 @@ class PipelineRunner:
                     return
 
         # ========== 流水线路径 ==========
-        self.state.ask_count = 0  # 进入流水线，重置 ask 计数
+        self.state.ask_count = 0
+
+        # 🔥 追问检测：如果上一轮已经搜过+有专家输出，新消息是追问/补充信息
+        # → 不重走搜索，直接基于已有数据回答
+        has_prior_research = len(self.state.research_data) > 0
+        has_prior_experts = len(self.state.expert_outputs) > 0
+        is_followup = has_prior_research and len(msg) < 200
+
+        if is_followup and (has_prior_research or has_prior_experts):
+            # 追问路径：用已有数据 + 新信息直接回答
+            yield {"type": "status", "content": "Updating analysis with your input..."}
+            reply = await self._followup_reply(msg)
+            yield {"type": "message", "content": reply}
+            self.state.message_history.append({"role": "assistant", "content": reply})
+            await self._persist()
+            return
 
         # Step 1: UNDERSTAND
         yield {"type": "status", "content": "Understanding your product..."}
@@ -165,7 +180,7 @@ class PipelineRunner:
         # 如果消息够长且包含产品信号，让 LLM 提取结构化信息
         if len(user_message) > 30 and self._has_product_signals(user_message.lower()):
             response = await self.llm.generate(
-                system_prompt="Extract product information from the user's message. Return a JSON object with: name, description, type (saas/tool/consumer_app/ecommerce/etc), audience, goal, budget. If a field is not mentioned, use empty string. Return ONLY valid JSON, nothing else.",
+                system_prompt="Extract product information from the user's message. Return a JSON object with: name, description (what the product does in one sentence), type (saas/tool/consumer_app/ecommerce/etc), audience (who uses it), goal, budget, search_keywords (3-5 keywords for searching competitors and market, DO NOT use the product name, use descriptive terms like 'AI resume optimizer' not 'ResumeAI'). Return ONLY valid JSON.",
                 messages=[{"role": "user", "content": user_message}],
                 tier=TaskTier.PARSING,
                 max_tokens=300,
@@ -182,10 +197,6 @@ class PipelineRunner:
 
     async def _step_research(self, product_info: dict) -> list:
         """Step 2: 并行搜索市场数据"""
-        desc = product_info.get("raw_description", "")
-        name = product_info.get("name", "")
-        query_base = name if name else desc[:80]
-
         results = []
         search_tool = self.tools.get("web_search")
         social_tool = self.tools.get("social_search")
@@ -193,13 +204,35 @@ class PipelineRunner:
         if not search_tool:
             return results
 
-        # 构建 3 个不同角度的搜索（并行）
+        # 🔥 关键：用产品描述/类型/受众搜索，不用产品名！
+        desc = product_info.get("description", "")
+        audience = product_info.get("audience", "")
+        ptype = product_info.get("type", "")
+        raw = product_info.get("raw_description", "")
+        keywords = product_info.get("search_keywords", [])
+        
+        # 优先用 LLM 提取的 search_keywords
+        if keywords and isinstance(keywords, list) and len(keywords) >= 2:
+            search_base = " ".join(keywords[:4])
+        elif desc and len(desc) > 10:
+            search_base = desc[:100]
+        elif raw:
+            search_base = raw[:150]
+        else:
+            search_base = "software product"
+        
+        if audience and audience.lower() not in search_base.lower():
+            search_base = f"{search_base} for {audience}"
+
+        # 构建 3 个不同角度的搜索
         queries = [
-            f"{query_base} competitors market analysis 2026",
-            f"{query_base} user acquisition growth strategy",
+            f"{search_base} competitors pricing comparison 2026",
+            f"{search_base} user acquisition channels best practices",
         ]
         if social_tool:
-            queries.append(f"{query_base} reddit discussion")
+            # 社交搜索用更自然的语言
+            social_query = f"{audience or 'developers'} {desc[:50] or search_base[:50]} recommendation"
+            queries.append(social_query)
 
         # 去重
         queries = [q for q in queries if q not in self.state.searched_queries]
@@ -378,6 +411,37 @@ Be brief and natural. 3-5 paragraphs max.""",
             return f"[{expert.name}] Error: {str(e)[:100]}"
 
     # ========== 快速回复 ==========
+
+    async def _followup_reply(self, user_message: str) -> str:
+        """基于已有研究数据回答追问（不重走搜索）"""
+        from app.agent.engine.llm_adapter import TaskTier
+
+        lang = "Chinese" if self._language == "zh" else "English"
+        
+        # 构建已有数据的摘要
+        research_brief = ""
+        for r in self.state.research_data[-5:]:
+            if r.get("useful"):
+                research_brief += f"- {json.dumps(r.get('result', {}), ensure_ascii=False, default=str)[:300]}\n"
+        
+        expert_brief = ""
+        for eid, output in self.state.expert_outputs.items():
+            expert_brief += f"- {eid}: {output[:200]}\n"
+
+        response = await self.llm.generate(
+            system_prompt=f"""You are CrabRes, an AI growth agent. Respond in {lang}.
+
+The user is following up on a previous analysis. Use the existing research and expert data to answer their question or incorporate their new information.
+
+Be concise and natural. If they gave a constraint (like "no budget"), adjust the previous advice accordingly. Don't repeat everything — just address what changed.""",
+            messages=[
+                {"role": "user", "content": f"Previous research data:\n{research_brief[:1500]}\n\nPrevious expert analysis:\n{expert_brief[:1500]}"},
+                {"role": "assistant", "content": "I have the context from our previous analysis."},
+            ] + self.state.message_history[-4:],
+            tier=TaskTier.THINKING,
+            max_tokens=1500,
+        )
+        return response.content
 
     async def _quick_reply(self, user_message: str, instruction: str) -> str:
         """LLM 简短回复（不调工具，不调专家）"""
