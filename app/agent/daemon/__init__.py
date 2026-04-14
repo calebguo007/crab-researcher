@@ -107,6 +107,9 @@ class GrowthDaemon:
         # 5. 目标进度检查
         tasks.append(self._check_goals())
 
+        # 5.5 消费审批队列 — 执行已批准的操作
+        tasks.append(self._drain_execution_queue())
+
         # 6. 真实世界连接（RSS + 竞品爬虫 + Action 追踪）
         tasks.append(self._real_world.tick())
 
@@ -415,6 +418,45 @@ class GrowthDaemon:
                 )
         except Exception as e:
             logger.error(f"Goal check failed: {e}")
+        return discoveries
+
+    async def _drain_execution_queue(self) -> list[dict]:
+        """消费审批队列 — 执行已批准的操作"""
+        discoveries = []
+        try:
+            from app.agent.engine.execution import ExecutionEngine
+            from app.agent.engine.autonomous import AutonomousEngine
+            from app.agent.engine.action_tracker import ActionTracker
+
+            exec_engine = ExecutionEngine(
+                tools=self.tools,
+                memory=self.memory,
+                autonomous=AutonomousEngine(self.memory),
+                tracker=ActionTracker(),
+            )
+
+            results = await exec_engine.drain_approved_queue()
+            for result in results:
+                if result.success:
+                    discoveries.append({
+                        "type": "action_executed",
+                        "platform": result.platform,
+                        "status": result.status,
+                        "url": result.url,
+                    })
+                else:
+                    discoveries.append({
+                        "type": "action_failed",
+                        "platform": result.platform,
+                        "error": result.error,
+                    })
+
+            if results:
+                logger.info(f"Daemon executed {len(results)} approved actions")
+
+        except Exception as e:
+            logger.error(f"Execution queue drain failed: {e}")
+
         return discoveries
 
     async def _midnight_boundary(self):

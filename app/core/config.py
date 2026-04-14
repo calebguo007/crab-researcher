@@ -77,6 +77,24 @@ class Settings(BaseSettings):
     TWITTER_ACCESS_TOKEN_SECRET: Optional[str] = None
     TWITTER_BEARER_TOKEN: Optional[str] = None
 
+
+    # ========== Reddit API（发帖/评论）==========
+    REDDIT_CLIENT_ID: Optional[str] = None
+    REDDIT_CLIENT_SECRET: Optional[str] = None
+    REDDIT_USERNAME: Optional[str] = None
+    REDDIT_PASSWORD: Optional[str] = None
+
+    # ========== Email（SMTP / Resend）==========
+    RESEND_API_KEY: Optional[str] = None
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    EMAIL_FROM: Optional[str] = None
+
+    # ========== LinkedIn API ==========
+    LINKEDIN_ACCESS_TOKEN: Optional[str] = None
+
     # ========== MCP 客户端（调用外部 MCP 服务器）==========
     MCP_SERVERS: str = ""  # 格式: name1:url1|name2:url2 或留空
 

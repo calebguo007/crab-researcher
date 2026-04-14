@@ -645,8 +645,91 @@ Create 3 phases (Prep/Execute/Track) with 3-5 steps each. Be VERY specific.""",
         except Exception as e:
             logger.warning(f"Failed to generate playbook: {e}")
 
+        # ===== Step 5b: EXECUTE — 真正执行操作（不只是生成文件）=====
+        # 这是"顾问"和"员工"的分水岭
+        try:
+            from app.agent.engine.execution import ExecutionEngine, ExecutionRequest
+            from app.agent.engine.autonomous import AutonomousEngine
+            from app.agent.engine.action_tracker import ActionTracker
+
+            exec_engine = ExecutionEngine(
+                tools=self.tools,
+                memory=self.memory,
+                autonomous=AutonomousEngine(self.memory),
+                tracker=ActionTracker(),
+            )
+
+            # 用 LLM 从策略中提取可立即执行的操作
+            exec_prompt = (
+                "From the growth strategy, extract IMMEDIATE executable actions.\n"
+                "Return ONLY valid JSON array. Each item:\n"
+                '{"action_type": "reddit_post|twitter_post|send_email|reddit_comment",\n'
+                ' "platform": "reddit|x|email",\n'
+                ' "description": "what this does",\n'
+                ' "params": {...action-specific params...}}\n\n'
+                'For reddit_post: {"subreddit": "...", "title": "...", "text": "..."}\n'
+                'For twitter_post: {"text": "..."}\n'
+                'For send_email: {"to": "...", "subject": "...", "body": "..."}\n\n'
+                "ONLY include actions that can be executed RIGHT NOW with the draft content.\n"
+                "If no immediate actions, return empty array [].\n"
+                "Max 3 actions per session."
+            )
+            exec_plan = await self.llm.generate(
+                system_prompt=exec_prompt,
+                messages=[{
+                    "role": "user",
+                    "content": f"Strategy: {strategy_response[:1500]}\n\nProduct: {product_desc}",
+                }],
+                tier=TaskTier.PARSING,
+                max_tokens=800,
+            )
+
+            # 解析执行计划
+            raw_plan = exec_plan.content.strip()
+            if "```" in raw_plan:
+                raw_plan = raw_plan.split("```")[1].split("```")[0]
+                if raw_plan.startswith("json"):
+                    raw_plan = raw_plan[4:]
+
+            actions = json.loads(raw_plan)
+            if isinstance(actions, list):
+                execution_results = []
+                for act in actions[:3]:
+                    req = ExecutionRequest(
+                        action_type=act.get("action_type", ""),
+                        platform=act.get("platform", ""),
+                        description=act.get("description", ""),
+                        params=act.get("params", {}),
+                        source="pipeline",
+                    )
+                    result = await exec_engine.execute(req)
+                    execution_results.append({
+                        "action": act.get("action_type"),
+                        "platform": act.get("platform"),
+                        "status": result.status,
+                        "success": result.success,
+                        "url": result.url,
+                    })
+
+                if execution_results:
+                    exec_summary = ", ".join(
+                        f"{r['platform']}({r['status']})" for r in execution_results
+                    )
+                    deliverables.append({
+                        "name": "Executed Actions",
+                        "desc": f"{len(execution_results)} actions executed: {exec_summary}",
+                        "path": "execution_log",
+                        "execution_results": execution_results,
+                    })
+                    logger.info(f"Executed {len(execution_results)} actions from pipeline")
+
+        except json.JSONDecodeError:
+            logger.debug("No executable actions extracted from strategy")
+        except Exception as e:
+            logger.warning(f"Execution step failed (non-fatal): {e}")
+
         if deliverables:
-            logger.info(f"Delivered {len(deliverables)} files to workspace")
+            logger.info(f"Delivered {{len(deliverables)}} items (files + executions) to workspace")
 
         return deliverables
 

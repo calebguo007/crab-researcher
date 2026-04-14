@@ -31,6 +31,7 @@ from app.api.v2 import daemon as daemon_v2
 from app.api.v2 import webhooks as webhooks_v2
 from app.api.v2 import real_world as real_world_v2
 from app.api.v2 import notifications as notifications_v2
+from app.api.v2 import execution as execution_v2
 from app.channels.feishu_bot import router as feishu_router
 from app.channels.openclaw_skill import router as openclaw_router
 from app.channels.discord_bot import router as discord_router
@@ -67,6 +68,14 @@ async def lifespan(app: FastAPI):
     tools.register(WebSearchTool())
     tools.register(ScrapeWebsiteTool())
     tools.register(SocialSearchTool())
+
+    # 执行类工具（真正发帖/发邮件）
+    from app.agent.tools.reddit import RedditPostTool, RedditCommentTool, RedditSearchTool
+    from app.agent.tools.email_sender import SendEmailTool
+    tools.register(RedditPostTool())
+    tools.register(RedditCommentTool())
+    tools.register(RedditSearchTool())
+    tools.register(SendEmailTool())
     memory = GrowthMemory(base_dir=".crabres/memory/global")
     llm = AgentLLM(budget_limit_usd=0.1)  # Daemon 预算很低
 
@@ -164,6 +173,7 @@ app.include_router(daemon_v2.router, prefix=settings.API_PREFIX)
 app.include_router(webhooks_v2.router, prefix=settings.API_PREFIX)
 app.include_router(real_world_v2.router, prefix=settings.API_PREFIX)
 app.include_router(notifications_v2.router, prefix=settings.API_PREFIX)
+app.include_router(execution_v2.router, prefix=settings.API_PREFIX)
 
 # 渠道路由
 app.include_router(feishu_router, prefix=settings.API_PREFIX)
