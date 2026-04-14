@@ -28,6 +28,7 @@ from app.api.v2 import metrics as metrics_v2
 from app.api.v2 import deep_strategy as deep_strategy_v2
 from app.api.v2 import eval as eval_v2
 from app.api.v2 import daemon as daemon_v2
+from app.api.v2 import webhooks as webhooks_v2
 from app.channels.feishu_bot import router as feishu_router
 from app.channels.openclaw_skill import router as openclaw_router
 from app.channels.discord_bot import router as discord_router
@@ -70,6 +71,11 @@ async def lifespan(app: FastAPI):
     daemon = GrowthDaemon(memory=memory, tools=tools, llm=llm, notifier=NotificationHub())
     await daemon.start()
     app.state.growth_daemon = daemon
+
+    # EventBus — Agent 的神经系统
+    from app.agent.events import get_event_bus
+    event_bus = await get_event_bus()
+    app.state.event_bus = event_bus
 
     # Telegram 长轮询模式（不依赖公网 Webhook，本地开发也能用）
     from app.channels.telegram_polling import TelegramPoller
@@ -153,6 +159,7 @@ app.include_router(metrics_v2.router, prefix=settings.API_PREFIX)
 app.include_router(deep_strategy_v2.router, prefix=settings.API_PREFIX)
 app.include_router(eval_v2.router, prefix=settings.API_PREFIX)
 app.include_router(daemon_v2.router, prefix=settings.API_PREFIX)
+app.include_router(webhooks_v2.router, prefix=settings.API_PREFIX)
 
 # 渠道路由
 app.include_router(feishu_router, prefix=settings.API_PREFIX)

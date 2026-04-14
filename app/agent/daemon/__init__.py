@@ -114,6 +114,19 @@ class GrowthDaemon:
                     except Exception as e:
                         logger.error(f"Notification failed: {e}")
 
+            # 发布到 EventBus（前端 SSE 实时展示）
+            try:
+                from app.agent.events import get_event_bus
+                bus = await get_event_bus()
+                for d in self._discoveries:
+                    await bus.publish(f"daemon.discovery.{d.get('type', 'unknown')}", d)
+                await bus.publish("daemon.tick", {
+                    "discoveries_count": len(self._discoveries),
+                    "timestamp": time.time(),
+                })
+            except Exception as e:
+                logger.debug(f"EventBus publish failed: {e}")
+
     async def _enrich_discovery(self, discovery: dict, product: dict) -> dict:
         """用 LLM 分析发现并生成行动建议"""
         if not self.llm:
