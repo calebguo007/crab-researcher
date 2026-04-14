@@ -174,6 +174,24 @@ class PipelineRunner:
         except Exception:
             self._memory_context = ""
 
+        # 🔥 反思注入：加载自我改进笔记
+        try:
+            from app.agent.engine.reflection import ReflectionEngine
+            reflection_engine = ReflectionEngine(self.memory, self.llm)
+            self._reflection_context = reflection_engine.get_improvement_prompt()
+            # 检测用户负面反馈并记录
+            await reflection_engine.feedback_reflection(msg)
+        except Exception:
+            self._reflection_context = ""
+
+        # 🔥 目标注入：加载当前增长目标
+        try:
+            from app.agent.engine.goal_tracker import GoalTracker
+            goal_tracker = GoalTracker(self.memory)
+            self._goal_context = goal_tracker.get_goal_prompt()
+        except Exception:
+            self._goal_context = ""
+
         # 🔥 Skill 加载：搜索与当前任务相关的已学技能
         try:
             from app.agent.skills import SkillStore
@@ -447,7 +465,10 @@ STRICT FORMAT RULES:
 
 {getattr(self, '_mood_injection', '')}
 
-{f"MEMORY — what you know about this user from past sessions:{chr(10)}" + getattr(self, '_growth_patterns', '') if getattr(self, '_growth_patterns', '') else ''}""",
+{f"MEMORY — what you know about this user from past sessions:{chr(10)}" + getattr(self, '_growth_patterns', '') if getattr(self, '_growth_patterns', '') else ''}
+
+{getattr(self, '_reflection_context', '')}
+{getattr(self, '_goal_context', '')}""",
             messages=[{
                 "role": "user",
                 "content": f"Product: {json.dumps(product_info, ensure_ascii=False, default=str)[:600]}\n\nResearch:\n{research_summary}\n\nExpert analysis:\n{expert_summary}\n\nChannel-specific playbooks (use these specific tactics, don't generalize):\n{channel_advice}\n\nSynthesize into a natural, conversational growth strategy. Reference the specific channel tactics above.",

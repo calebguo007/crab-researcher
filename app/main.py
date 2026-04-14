@@ -30,6 +30,7 @@ from app.api.v2 import eval as eval_v2
 from app.api.v2 import daemon as daemon_v2
 from app.api.v2 import webhooks as webhooks_v2
 from app.api.v2 import real_world as real_world_v2
+from app.api.v2 import notifications as notifications_v2
 from app.channels.feishu_bot import router as feishu_router
 from app.channels.openclaw_skill import router as openclaw_router
 from app.channels.discord_bot import router as discord_router
@@ -162,6 +163,7 @@ app.include_router(eval_v2.router, prefix=settings.API_PREFIX)
 app.include_router(daemon_v2.router, prefix=settings.API_PREFIX)
 app.include_router(webhooks_v2.router, prefix=settings.API_PREFIX)
 app.include_router(real_world_v2.router, prefix=settings.API_PREFIX)
+app.include_router(notifications_v2.router, prefix=settings.API_PREFIX)
 
 # 渠道路由
 app.include_router(feishu_router, prefix=settings.API_PREFIX)

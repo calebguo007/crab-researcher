@@ -14,6 +14,10 @@ from typing import Optional
 
 from app.agent.daemon.scheduler import DaemonScheduler
 from app.agent.daemon.real_world import RealWorldConnector
+from app.agent.engine.reflection import ReflectionEngine
+from app.agent.engine.goal_tracker import GoalTracker
+from app.agent.engine.proactive_notifier import ProactiveNotifier
+from app.agent.engine.weekly_report import WeeklyReportGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,10 @@ class GrowthDaemon:
         self._running = False
         self._scheduler = DaemonScheduler(self)
         self._real_world = RealWorldConnector()
+        self._reflection = ReflectionEngine(memory, llm)
+        self._goal_tracker = GoalTracker(memory)
+        self._notifier = ProactiveNotifier()
+        self._weekly_report = WeeklyReportGenerator(memory, llm)
         self._discoveries: list[dict] = []  # 待通知的发现
 
     async def start(self):
@@ -96,7 +104,10 @@ class GrowthDaemon:
         # 4. 追踪已发布帖子的效果（action→result 闭环）
         tasks.append(self._scan_action_results())
 
-        # 5. 真实世界连接（RSS + 竞品爬虫 + Action 追踪）
+        # 5. 目标进度检查
+        tasks.append(self._check_goals())
+
+        # 6. 真实世界连接（RSS + 竞品爬虫 + Action 追踪）
         tasks.append(self._real_world.tick())
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -385,6 +396,27 @@ class GrowthDaemon:
 
         return metrics
 
+    async def _check_goals(self) -> list[dict]:
+        """检查目标进度，有风险时通知"""
+        discoveries = []
+        try:
+            status = await self._goal_tracker.check_progress()
+            if status.get("at_risk"):
+                discoveries.append({
+                    "type": "goal_at_risk",
+                    "at_risk": status["at_risk"],
+                    "overall_progress": status.get("overall_progress", 0),
+                })
+                await self._notifier.notify(
+                    "goal_at_risk",
+                    f"⚠️ Goal at risk ({status.get('overall_progress', 0)}%)",
+                    f"At risk: {', '.join(status['at_risk'])}",
+                    priority="high",
+                )
+        except Exception as e:
+            logger.error(f"Goal check failed: {e}")
+        return discoveries
+
     async def _midnight_boundary(self):
         """午夜边界：日报 + Growth Dream"""
         logger.info("Midnight boundary triggered")
@@ -500,3 +532,36 @@ Be specific. Use data from the entries. Output as structured bullet points.""",
                     logger.info(f"Dream Prune: removed old journal {f.name}")
 
         logger.info("Growth Dream: completed")
+
+    async def daily_reflection(self):
+        """每日反思 — midnight 时触发"""
+        try:
+            reflection = await self._reflection.daily_reflection()
+            if reflection and not reflection.get("error"):
+                await self._notifier.notify(
+                    "daily_reflection",
+                    "📝 Daily reflection completed",
+                    reflection.get("executive_summary", json.dumps(reflection.get("what_went_well", []))),
+                    priority="low",
+                )
+            return reflection
+        except Exception as e:
+            logger.error(f"Daily reflection failed: {e}")
+            return None
+
+    async def weekly_report(self):
+        """生成周报"""
+        try:
+            report = await self._weekly_report.generate()
+            if report and not report.get("error"):
+                await self._notifier.notify(
+                    "weekly_report",
+                    "📊 Weekly growth report ready",
+                    report.get("executive_summary", "Report generated"),
+                    priority="normal",
+                )
+            return report
+        except Exception as e:
+            logger.error(f"Weekly report failed: {e}")
+            return None
+

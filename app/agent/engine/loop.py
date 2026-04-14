@@ -853,6 +853,9 @@ Turn: {self.state.turn_count}
 
 {context.get('mood_injection', '')}
 
+{context.get('reflection_prompt', '')}
+{context.get('goal_prompt', '')}
+
 The user came here because they're tired of generic advice. Show them what real research looks like."""
 
     async def _execute_tool(self, action: AgentAction) -> Any:
@@ -1133,6 +1136,26 @@ The user came here because they're tired of generic advice. Show them what real 
             patterns_text = growth_patterns.get("patterns", "")
             if patterns_text:
                 context_summary_parts.append(f"[Growth patterns learned from past actions]:\n{patterns_text[:500]}")
+
+        # 注入反思改进笔记
+        try:
+            from app.agent.engine.reflection import ReflectionEngine
+            reflection = ReflectionEngine(self.memory, self.llm)
+            reflection_prompt = reflection.get_improvement_prompt()
+            if reflection_prompt:
+                context_summary_parts.append(reflection_prompt)
+        except Exception:
+            reflection_prompt = ""
+
+        # 注入目标追踪状态
+        try:
+            from app.agent.engine.goal_tracker import GoalTracker
+            goal_tracker = GoalTracker(self.memory)
+            goal_prompt = goal_tracker.get_goal_prompt()
+            if goal_prompt:
+                context_summary_parts.append(goal_prompt)
+        except Exception:
+            goal_prompt = ""
 
         # 注入实验追踪数据和增长规律（action→result 闭环）
         try:
