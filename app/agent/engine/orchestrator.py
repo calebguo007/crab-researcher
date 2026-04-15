@@ -177,7 +177,16 @@ class Orchestrator:
         
         输出：ctx.intent, ctx.has_product_info, ctx.is_self_awareness, ctx.direct_reply
         不 yield 任何可见事件（这个阶段对用户透明）
+        
+        注意：必须包含至少一个 yield 语句（即使不执行到），
+        否则 Python 会把这个方法当作 coroutine 而非 async generator，
+        导致 run() 中的 async for 报 TypeError。
         """
+        # 占位 yield — 使本方法成为 async generator（Python 语言要求）
+        # 这行永远不会执行到，但它的存在让 Python 正确识别方法类型
+        if False:
+            yield {}  # pragma: no cover
+
         msg = ctx.user_message
         msg_lower = msg.lower().strip()
         lang = ctx.language
