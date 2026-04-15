@@ -150,7 +150,16 @@ class PipelineRunner:
             # intent == "product" or "followup" → 继续进流水线
 
         # ========== 流水线路径 ==========
-        self.state.ask_count = 0
+        # 注意：ask_count 不在这里重置，它在 PipelineState 中初始化为 0
+        # 只有当用户提供了足够信息后才重置（见 _step_understand 之后的逻辑）
+
+        # 🔥 最后防线：如果消息太短（< 20 字符）且没有产品信号且没有历史研究数据
+        # → 这几乎不可能是一个有效的产品描述，走 chitchat 路径
+        if len(msg) < 20 and not self._has_product_signals(msg_lower) and not self.state.research_data:
+            reply = await self._quick_reply(msg, f"The user said something short and vague: \"{msg}\". This is NOT a product description. Reply naturally based on conversation history. If you don't know what they're referring to, ask what product they'd like help with. Be warm and casual.")
+            yield {"type": "message", "content": reply}
+            self.state.message_history.append({"role": "assistant", "content": reply})
+            return
 
         # 🔥 记忆注入：加载历史产品信息和增长模式，让 Agent 有"记忆感"
         prior_product = await self.memory.load("product")
@@ -219,13 +228,18 @@ class PipelineRunner:
         await self.memory.save("product", self.state.product_info)
 
         # 🔥 信息充分度检测：如果产品信息太模糊，先追问而不是生成垃圾 Playbook
-        has_name = bool(product_info.get("name") and product_info["name"] != "product")
-        has_desc = bool(product_info.get("description") and len(product_info.get("description", "")) > 20)
+        has_name = bool(product_info.get("name") and product_info["name"] not in ("product", "unknown", ""))
+        has_desc = bool(product_info.get("description") and len(product_info.get("description", "")) > 30)
         has_type = bool(product_info.get("type"))
         is_self = product_info.get("is_self", False)
+        # 额外检测：原始消息是否太短（< 30 字符的消息不太可能是完整的产品描述）
+        raw_too_short = len(product_info.get("raw_description", "")) < 30
         info_score = sum([has_name, has_desc, has_type, is_self])
+        # 如果原始消息太短，即使 LLM 提取出了一些字段，也要降分
+        if raw_too_short and not is_self:
+            info_score = min(info_score, 1)
 
-        if info_score < 2 and not is_self and self.state.ask_count < 1:
+        if info_score < 2 and not is_self and self.state.ask_count < 2:
             # 信息不够，用 LLM 生成一个自然的追问（不是硬编码）
             self.state.ask_count += 1
             lang = "Chinese" if self._language == "zh" else "English"
@@ -597,6 +611,15 @@ Be brief and natural. 3-5 paragraphs max.""",
         from app.agent.engine.llm_adapter import TaskTier
         from pathlib import Path
 
+        # 🔥 质量门控：如果产品信息太模糊，不生成交付物（垃圾进 = 垃圾出）
+        product_name = product_info.get("name", "product")
+        product_desc_raw = product_info.get("raw_description", "")
+        has_real_name = product_name not in ("product", "unknown", "")
+        has_real_desc = bool(product_info.get("description") and len(product_info.get("description", "")) > 20)
+        if not has_real_name and not has_real_desc and len(product_desc_raw) < 30:
+            logger.warning(f"Skipping deliverables: product info too vague (name={product_name}, desc_len={len(product_desc_raw)})")
+            return []
+
         workspace = Path(str(self.memory.base_dir)).parent / "workspace"
         workspace.mkdir(parents=True, exist_ok=True)
         for sub in ["drafts", "reports", "plans"]:
@@ -604,7 +627,6 @@ Be brief and natural. 3-5 paragraphs max.""",
 
         deliverables = []
         lang = "Chinese" if self._language == "zh" else "English"
-        product_name = product_info.get("name", "product")
         product_desc = json.dumps(product_info, ensure_ascii=False, default=str)[:500]
 
         # 1. 竞品分析报告
@@ -1004,9 +1026,15 @@ Respond in {lang}. {instruction}{product_ctx}""",
             system_prompt="""Classify the user's intent into exactly ONE of these categories:
 - self_awareness: User is asking about CrabRes itself (what it is, its capabilities, asking it to do something for itself)
 - greeting: Pure greeting with no substance
-- product: User is describing a product or asking for growth/marketing help
-- followup: User is following up on a previous topic or answering a question
-- chitchat: General chat that doesn't fit above categories
+- product: User is describing a product or asking for growth/marketing help. Must contain actual product info (name, what it does, target audience, etc.)
+- followup: User is directly answering a question CrabRes just asked (providing info that was requested)
+- chitchat: General chat, questions about features, casual remarks, or anything that doesn't contain actual product information
+
+CRITICAL RULES:
+- If the message is short and vague (like "历史记忆还有吗", "还在吗", "能做什么"), classify as "chitchat" NOT "product"
+- "product" requires ACTUAL product details (name + what it does). Vague phrases are NOT product descriptions
+- "followup" requires CrabRes to have just asked a specific question that this message answers
+- When in doubt between "product" and "chitchat", choose "chitchat" — it's safer to chat than to generate a garbage strategy
 
 Reply with ONLY the category name, nothing else.""",
             messages=[{
