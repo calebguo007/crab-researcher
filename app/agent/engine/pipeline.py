@@ -171,9 +171,16 @@ class PipelineRunner:
         # 注意：ask_count 不在这里重置，它在 PipelineState 中初始化为 0
         # 只有当用户提供了足够信息后才重置（见 _step_understand 之后的逻辑）
 
-        # 🔥 最后防线：如果消息太短（< 20 字符）且没有产品信号且没有历史研究数据
-        # → 这几乎不可能是一个有效的产品描述，走 chitchat 路径
-        if len(msg) < 20 and not self._has_product_signals(msg_lower) and not self.state.research_data:
+        # 🔥 最后防线：仅在完全没有上下文时才拦截
+        # 必须同时满足：消息短 + 没有产品信号 + 没有历史研究 + 没有已有产品上下文
+        has_any_context = (
+            self.state.research_data
+            or self.state.product_info.get("name")
+            or any(self._is_self_referencing(m.get("content", ""))
+                   for m in self.state.message_history[-8:]
+                   if m.get("role") == "user")
+        )
+        if len(msg) < 20 and not self._has_product_signals(msg_lower) and not has_any_context:
             reply = await self._quick_reply(msg, f"The user said something short and vague: \"{msg}\". This is NOT a product description. Reply naturally based on conversation history. If you don't know what they're referring to, ask what product they'd like help with. Be warm and casual.")
             yield {"type": "message", "content": reply}
             self.state.message_history.append({"role": "assistant", "content": reply})
@@ -223,6 +230,24 @@ class PipelineRunner:
             self._skill_context = await skill_store.get_skills_for_prompt(msg)
         except Exception:
             self._skill_context = ""
+
+        # 🔥 工具请求检测：无论是否有 prior_research，用户明确要求执行动作时都应该调工具
+        tool_triggers = [
+            "browser", "浏览器", "browse", "打开", "看看", "访问", "scrape",
+            "搜索", "search", "找", "查", "分析", "analyze",
+            "发帖", "post", "发布", "publish", "执行", "execute",
+            "写", "write", "draft", "起草",
+        ]
+        is_tool_request = any(t in msg_lower for t in tool_triggers)
+        
+        if is_tool_request and self.state.product_info.get("name"):
+            # 有产品上下文 + 用户要求执行动作 → 直接调工具
+            yield {"type": "status", "content": "Executing your request..."}
+            reply = await self._tool_followup(msg)
+            yield {"type": "message", "content": reply}
+            self.state.message_history.append({"role": "assistant", "content": reply})
+            await self._persist()
+            return
 
         # 🔥 追问检测：如果上一轮已经搜过+有专家输出，新消息是追问/补充信息
         has_prior_research = len(self.state.research_data) > 0
@@ -1180,6 +1205,10 @@ Respond in {lang}. {instruction}{product_ctx}""",
 
     def _has_product_signals(self, msg: str) -> bool:
         """检测消息是否包含产品信息（纯代码，0 token）"""
+        # 🔥 强信号不受长度限制
+        strong_signals = ["crabres", "crab-res", "crab res", "ai growth"]
+        if any(s in msg for s in strong_signals):
+            return True
         if len(msg) < 15:
             return False
         signals = [
