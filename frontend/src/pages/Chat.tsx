@@ -18,6 +18,7 @@ import PixImg from '../assets/pix_basic.png'
 interface ChatProps {
   creature: CreatureState
   onBack: () => void
+  onPlan?: () => void
 }
 
 interface Message {
@@ -31,7 +32,7 @@ interface Message {
 const STORAGE_KEY = 'crabres_chat_messages'
 const SESSION_KEY = 'crabres_chat_session'
 
-export function Chat({ creature, onBack }: ChatProps) {
+export function Chat({ creature, onBack, onPlan }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -270,6 +271,8 @@ export function Chat({ creature, onBack }: ChatProps) {
 
               // ── Agent 主回复：卡片式，Markdown 格式化 ──
               if (msg.role === 'assistant') {
+                const hasPlaybook = msg.content.includes('Playbook') || msg.content.includes('playbook') || msg.content.includes('Plan tab')
+                const hasDeliverables = msg.content.includes('prepared these') || msg.content.includes('workspace')
                 return (
                   <div key={msg.id} className="animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
@@ -280,6 +283,17 @@ export function Chat({ creature, onBack }: ChatProps) {
                     <div className="crabres-prose ml-8">
                       <ReactMarkdown>{msg.content}</ReactMarkdown>
                     </div>
+                    {/* 交付物消息 → 显示跳转按钮 */}
+                    {(hasPlaybook || hasDeliverables) && onPlan && (
+                      <div className="ml-8 mt-3 flex gap-2">
+                        <button onClick={onPlan}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-brand/8 text-brand text-xs font-medium hover:bg-brand/15 transition-all group">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+                          Open Growth Playbook
+                          <span className="opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )
               }

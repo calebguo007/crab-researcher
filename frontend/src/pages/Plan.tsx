@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react'
 import type { CreatureState } from '../components/creature/types'
 import { api } from '../lib/api'
-import { ArrowLeftIcon } from '../components/ui/Icons'
+import { ArrowLeftIcon, PlaybookIcon, AlertTriangleIcon, CircleCheckIcon, RocketIcon } from '../components/ui/Icons'
 
 interface PlanProps {
   creature: CreatureState
@@ -71,7 +71,7 @@ export function Plan({ creature, onBack }: PlanProps) {
         {/* 空状态 */}
         {!loading && playbooks.length === 0 && (
           <div className="text-center py-16">
-            <div className="text-4xl mb-4">📋</div>
+            <PlaybookIcon className="w-12 h-12 text-muted mx-auto mb-4" />
             <p className="text-lg font-heading font-bold text-primary mb-2">
               {isGlobal ? 'No playbooks yet' : '还没有执行手册'}
             </p>
@@ -208,8 +208,8 @@ export function Plan({ creature, onBack }: PlanProps) {
                 </h3>
                 <div className="card p-4 space-y-1">
                   {activePb.risk_factors.map((r: string, i: number) => (
-                    <p key={i} className="text-xs text-secondary flex gap-2">
-                      <span className="text-accent shrink-0">⚠️</span>{r}
+                    <p key={i} className="text-xs text-secondary flex items-start gap-2">
+                      <AlertTriangleIcon className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />{r}
                     </p>
                   ))}
                 </div>

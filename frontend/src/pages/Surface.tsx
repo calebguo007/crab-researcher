@@ -7,7 +7,7 @@ import { useState, useEffect } from 'react'
 import type { CreatureState } from '../components/creature/types'
 import { api } from '../lib/api'
 import { t, getLang } from '../lib/i18n'
-import { SettingsIcon, PenIcon, ChatIcon, ZapIcon } from '../components/ui/Icons'
+import { SettingsIcon, PenIcon, ChatIcon, ZapIcon, ChartBarIcon, PlaybookIcon } from '../components/ui/Icons'
 import PixImg from '../assets/pix_basic.png'
 
 interface SurfaceProps {
@@ -164,7 +164,7 @@ export function Surface({ creature, onChat, onPlan, onDashboard, onSettings }: S
       <div className="w-full space-y-2 mb-8">
         <button onClick={onDashboard}
           className="w-full py-3 rounded-xl border border-brand/20 text-sm font-medium text-brand hover:bg-brand/5 transition-all flex items-center justify-center gap-2">
-          <span>📊</span> Agent Dashboard
+          <ChartBarIcon className="w-4 h-4" /> Agent Dashboard
         </button>
         <button onClick={onPlan}
           className="w-full py-3 rounded-xl border border-border text-sm font-medium text-primary hover:bg-hover transition-all">

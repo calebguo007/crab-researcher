@@ -584,6 +584,17 @@ Base it on the strategy and research data provided.""",
 
             playbook_json = await self.llm.generate(
                 system_prompt=f"""Generate a structured growth playbook in JSON format. Language: {lang}.
+
+CRITICAL RULES FOR INDIE DEVELOPERS:
+- This is for a solo developer or tiny team (1-3 people)
+- Budget should be realistic: $0-$100 per step, not $500-$1000
+- Time should be realistic: "2 hours" not "5 days"
+- Steps must be IMMEDIATELY actionable: "Post in r/SideProject with this exact format..." not "Conduct market research"
+- Include SPECIFIC platforms, subreddits, communities, hashtags, templates
+- Every step should have a concrete deliverable the developer can check off
+- NO generic advice like "Create a brand identity" or "Develop a marketing strategy"
+- YES specific actions like "Write a Show HN post: title format '[Show HN] I built X to solve Y', body: 3 paragraphs max"
+
 Return ONLY valid JSON with this exact structure:
 {{
   "name": "Playbook name",
@@ -602,7 +613,7 @@ Return ONLY valid JSON with this exact structure:
         {{
           "order": 1,
           "title": "Step title",
-          "detail": "3-5 sentences of specific instructions",
+          "detail": "3-5 sentences of SPECIFIC instructions with exact platforms, formats, and templates",
           "tools": ["tool1"],
           "budget": "$0",
           "duration": "30 min",
@@ -614,7 +625,7 @@ Return ONLY valid JSON with this exact structure:
     }}
   ]
 }}
-Create 3 phases (Prep/Execute/Track) with 3-5 steps each. Be VERY specific.""",
+Create 3 phases with 4-5 steps each. Phase 1: Launch Prep (Day 1-3), Phase 2: Distribution Blitz (Day 4-14), Phase 3: Iterate & Scale (Day 15-30).""",
                 messages=[{"role": "user", "content": f"Product: {product_desc}\n\nStrategy: {strategy_response[:1000]}"}],
                 tier=_TaskTier.THINKING,
                 max_tokens=2500,

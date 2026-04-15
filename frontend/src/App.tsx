@@ -272,7 +272,7 @@ export default function App() {
   }
 
   if (page === 'chat') {
-    return <Chat creature={creature} onBack={() => setPage('surface')} />
+    return <Chat creature={creature} onBack={() => setPage('surface')} onPlan={() => setPage('plan')} />
   }
 
   if (page === 'plan') {

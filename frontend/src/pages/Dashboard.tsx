@@ -9,7 +9,7 @@ import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { CreatureState } from '../components/creature/types'
 import { api } from '../lib/api'
-import { ArrowLeftIcon, BellIcon, TargetIcon, CalendarIcon, ShieldCheckIcon, ZapIcon } from '../components/ui/Icons'
+import { ArrowLeftIcon, BellIcon, TargetIcon, CalendarIcon, ShieldCheckIcon, ZapIcon, SearchSparkIcon, NewsIcon, ChartBarIcon, BrainIcon, GearIcon, PinIcon, LockIcon, CircleCheckIcon, AlertTriangleIcon, RocketIcon } from '../components/ui/Icons'
 
 interface DashboardProps {
   creature: CreatureState
@@ -191,9 +191,30 @@ function OverviewTab({ goals, pending, unreadCount, reports }: any) {
             )}
           </div>
         ) : (
-          <div className="card p-6 text-center">
-            <p className="text-sm text-muted mb-2">No goals set yet</p>
-            <p className="text-xs text-muted">Chat with CrabRes to define growth objectives</p>
+          <div className="card p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-brand/8 flex items-center justify-center">
+                <RocketIcon className="w-5 h-5 text-brand" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-primary">Getting started</p>
+                <p className="text-xs text-muted">Tell CrabRes about your product to set growth goals</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-secondary p-2 rounded-lg bg-hover">
+                <span className="w-5 h-5 rounded-full bg-brand/10 flex items-center justify-center text-[10px] font-bold text-brand">1</span>
+                <span>Describe your product in the chat</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-secondary p-2 rounded-lg bg-hover">
+                <span className="w-5 h-5 rounded-full bg-brand/10 flex items-center justify-center text-[10px] font-bold text-brand">2</span>
+                <span>CrabRes researches your market & competitors</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-secondary p-2 rounded-lg bg-hover">
+                <span className="w-5 h-5 rounded-full bg-brand/10 flex items-center justify-center text-[10px] font-bold text-brand">3</span>
+                <span>Growth playbook & goals auto-generated here</span>
+              </div>
+            </div>
           </div>
         )}
       </section>
@@ -240,15 +261,15 @@ function OverviewTab({ goals, pending, unreadCount, reports }: any) {
 
 // === Notifications Tab ===
 function NotificationsTab({ notifications, onMarkRead, onMarkAllRead }: any) {
-  const typeIcons: Record<string, string> = {
-    competitor_change: '🔍',
-    rss_discovery: '📰',
-    action_result: '📊',
-    goal_at_risk: '⚠️',
-    daily_reflection: '📝',
-    approval_needed: '🔐',
-    skill_learned: '🧠',
-    system: '⚙️',
+  const typeIcons: Record<string, React.ReactNode> = {
+    competitor_change: <SearchSparkIcon className="w-4 h-4 text-blue-500" />,
+    rss_discovery: <NewsIcon className="w-4 h-4 text-emerald-500" />,
+    action_result: <ChartBarIcon className="w-4 h-4 text-brand" />,
+    goal_at_risk: <AlertTriangleIcon className="w-4 h-4 text-amber-500" />,
+    daily_reflection: <BrainIcon className="w-4 h-4 text-purple-500" />,
+    approval_needed: <LockIcon className="w-4 h-4 text-red-500" />,
+    skill_learned: <BrainIcon className="w-4 h-4 text-indigo-500" />,
+    system: <GearIcon className="w-4 h-4 text-gray-500" />,
   }
 
   return (
@@ -262,7 +283,7 @@ function NotificationsTab({ notifications, onMarkRead, onMarkAllRead }: any) {
 
       {notifications.length === 0 ? (
         <div className="card p-8 text-center">
-          <p className="text-2xl mb-2">🔔</p>
+          <BellIcon className="w-8 h-8 text-muted mx-auto mb-2" />
           <p className="text-sm text-muted">No notifications yet</p>
           <p className="text-xs text-muted mt-1">Agent discoveries will appear here</p>
         </div>
@@ -274,7 +295,7 @@ function NotificationsTab({ notifications, onMarkRead, onMarkAllRead }: any) {
               className={`card p-3 flex items-start gap-3 cursor-pointer transition-all ${
                 !n.read ? 'border-brand/20 bg-brand/3' : 'opacity-70'
               }`}>
-              <span className="text-base mt-0.5">{typeIcons[n.type] || '📌'}</span>
+              <span className="mt-0.5 shrink-0">{typeIcons[n.type] || <PinIcon className="w-4 h-4 text-muted" />}</span>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm ${!n.read ? 'font-medium text-primary' : 'text-secondary'}`}>{n.title}</p>
                 <p className="text-xs text-muted mt-0.5 line-clamp-2">{n.body}</p>
@@ -300,7 +321,7 @@ function ApprovalsTab({ pending, onApprove, onReject }: any) {
 
       {pending.length === 0 ? (
         <div className="card p-8 text-center">
-          <p className="text-2xl mb-2">✅</p>
+          <CircleCheckIcon className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
           <p className="text-sm text-muted">No pending approvals</p>
           <p className="text-xs text-muted mt-1">Agent will request approval for risky actions</p>
         </div>
@@ -361,7 +382,7 @@ function ReportsTab({ reports }: any) {
 
       {reports.length === 0 ? (
         <div className="card p-8 text-center">
-          <p className="text-2xl mb-2">📊</p>
+          <ChartBarIcon className="w-8 h-8 text-muted mx-auto mb-2" />
           <p className="text-sm text-muted">No reports yet</p>
           <p className="text-xs text-muted mt-1">Weekly reports auto-generate every Monday</p>
         </div>
