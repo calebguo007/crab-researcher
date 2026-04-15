@@ -48,25 +48,7 @@ async def _get_browser():
         logger.info("🛡️ Browser initialized with Patchright (anti-detection)")
         return _browser
     except Exception as e:
-        logger.info(f"Patchright not available ({e}), trying Playwright...")
-
-    # 降级到普通 Playwright
-    try:
-        from playwright.async_api import async_playwright
-        _playwright = await async_playwright().start()
-        _browser = await _playwright.chromium.launch(
-            headless=True,
-            args=[
-                '--no-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-blink-features=AutomationControlled',
-            ],
-        )
-        _engine_name = "playwright"
-        logger.info("🌐 Browser initialized with Playwright (standard)")
-        return _browser
-    except Exception as e:
-        logger.warning(f"No browser engine available: {e}")
+        logger.warning(f"No browser engine available (patchright failed: {e})")
         return None
 
 

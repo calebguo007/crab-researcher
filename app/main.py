@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
 
     # Playwright 浏览器预热（后台初始化，不阻塞启动）
     import asyncio
-    asyncio.create_task(_warmup_playwright())
+    asyncio.create_task(_warmup_browser())
 
     logging.info("🦀 CrabRes Agent Engine started!")
     yield
@@ -108,7 +108,7 @@ async def lifespan(app: FastAPI):
     logging.info("🦀 CrabRes shut down")
 
 
-async def _warmup_playwright():
+async def _warmup_browser():
     """后台预热 Playwright 浏览器（首次启动较慢）"""
     try:
         from app.agent.tools.browser import _get_browser
@@ -116,7 +116,7 @@ async def _warmup_playwright():
         if browser:
             logging.info("🌐 Playwright browser warmed up")
         else:
-            logging.warning("🌐 Playwright not available (install: playwright install chromium)")
+            logging.warning("🌐 Browser not available (install: patchright install chromium)")
     except Exception as e:
         logging.warning(f"🌐 Playwright warmup failed: {e}")
 

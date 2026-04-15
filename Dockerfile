@@ -11,8 +11,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 安装 Playwright Chromium（Agent 浏览器能力）
-RUN python3 -m playwright install chromium --with-deps 2>/dev/null || true
+# 安装 Patchright Chromium（反检测浏览器引擎）
+RUN python3 -m patchright install chromium 2>/dev/null || true
 
 COPY . .
 

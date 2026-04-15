@@ -61,24 +61,9 @@ class BrowserCrawler:
                 args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
             )
             engine = "patchright"
-        except Exception:
-            # 降级 Playwright
-            try:
-                from playwright.async_api import async_playwright
-                pw = await async_playwright().start()
-                self._browser = await pw.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--disable-gpu",
-                        "--disable-blink-features=AutomationControlled",
-                    ],
-                )
-                engine = "playwright"
-            except Exception as e:
-                logger.error(f"🌐 BrowserCrawler: no browser engine available: {e}")
-                raise
+        except Exception as e:
+            logger.error(f"🌐 BrowserCrawler: no browser engine available (patchright failed: {e})")
+            raise
 
         self._context = await self._browser.new_context(
             viewport={"width": 1280, "height": 720},
