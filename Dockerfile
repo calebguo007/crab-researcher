@@ -19,10 +19,10 @@ COPY . .
 # 创建数据目录
 RUN mkdir -p .crabres/memory .crabres/skills .crabres/crawl .crabres/notifications
 
-EXPOSE 8002
+# Railway 动态分配端口，不硬编码
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD curl -f http://localhost:8002/ || exit 1
 
 # tini 防止僵尸进程
 ENTRYPOINT ["/usr/bin/tini", "--"]
+# Railway 通过 startCommand 启动，CMD 作为 fallback
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "1"]

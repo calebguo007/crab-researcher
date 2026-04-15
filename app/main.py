@@ -57,50 +57,67 @@ logging.basicConfig(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期"""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """应用生命周期 — 所有子系统容错启动，不阻塞 healthcheck"""
 
+    # 数据库初始化（容错：未配置或连接失败不阻塞启动）
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logging.info("🗄️ Database initialized")
+    except Exception as e:
+        logging.warning(f"🗄️ Database init failed (will retry on first request): {e}")
+
+    # APScheduler 调度器
     scheduler = MonitoringScheduler()
     scheduler.start()
     app.state.monitoring_scheduler = scheduler
 
-    # Growth Daemon — APScheduler 驱动的持久化增长引擎
-    tools = ToolRegistry()
-    tools.register(WebSearchTool())
-    tools.register(ScrapeWebsiteTool())
-    tools.register(SocialSearchTool())
-
-    # 执行类工具（真正发帖/发邮件）
-    from app.agent.tools.reddit import RedditPostTool, RedditCommentTool, RedditSearchTool
-    from app.agent.tools.email_sender import SendEmailTool
-    tools.register(RedditPostTool())
-    tools.register(RedditCommentTool())
-    tools.register(RedditSearchTool())
-    tools.register(SendEmailTool())
-    memory = GrowthMemory(base_dir=".crabres/memory/global")
-    llm = AgentLLM(budget_limit_usd=0.1)  # Daemon 预算很低
-
-    daemon = GrowthDaemon(memory=memory, tools=tools, llm=llm, notifier=NotificationHub())
-    await daemon.start()
+    # Growth Daemon（容错启动）
+    daemon = None
+    try:
+        tools = ToolRegistry()
+        tools.register(WebSearchTool())
+        tools.register(ScrapeWebsiteTool())
+        tools.register(SocialSearchTool())
+        from app.agent.tools.reddit import RedditPostTool, RedditCommentTool, RedditSearchTool
+        from app.agent.tools.email_sender import SendEmailTool
+        tools.register(RedditPostTool())
+        tools.register(RedditCommentTool())
+        tools.register(RedditSearchTool())
+        tools.register(SendEmailTool())
+        memory = GrowthMemory(base_dir=".crabres/memory/global")
+        llm = AgentLLM(budget_limit_usd=0.1)
+        daemon = GrowthDaemon(memory=memory, tools=tools, llm=llm, notifier=NotificationHub())
+        await daemon.start()
+        logging.info("🤖 Growth Daemon started")
+    except Exception as e:
+        logging.warning(f"🤖 Growth Daemon init failed: {e}")
     app.state.growth_daemon = daemon
 
-    # EventBus — Agent 的神经系统
-    from app.agent.events import get_event_bus
-    event_bus = await get_event_bus()
-    app.state.event_bus = event_bus
+    # EventBus（容错启动）
+    try:
+        from app.agent.events import get_event_bus
+        event_bus = await get_event_bus()
+        app.state.event_bus = event_bus
+        logging.info("📡 EventBus started")
+    except Exception as e:
+        logging.warning(f"📡 EventBus init failed: {e}")
+        app.state.event_bus = None
 
-    # Telegram 长轮询模式 — 仅在配置了 token 时启动
+    # Telegram 长轮询（仅在配置 token 时启动）
     from app.channels.telegram_polling import TelegramPoller
     tg_poller = TelegramPoller()
     if os.environ.get("TELEGRAM_BOT_TOKEN"):
-        await tg_poller.start()
-        logging.info("📱 Telegram poller started")
+        try:
+            await tg_poller.start()
+            logging.info("📱 Telegram poller started")
+        except Exception as e:
+            logging.warning(f"📱 Telegram poller failed: {e}")
     else:
         logging.info("📱 Telegram poller skipped (no TELEGRAM_BOT_TOKEN)")
     app.state.telegram_poller = tg_poller
 
-    # Playwright 浏览器预热 — Railway 有足够内存运行 Chromium
+    # Playwright 浏览器预热（后台异步，不阻塞启动）
     import asyncio
     asyncio.create_task(_warmup_browser())
 
@@ -108,7 +125,8 @@ async def lifespan(app: FastAPI):
     yield
 
     await tg_poller.stop()
-    await daemon.stop()
+    if daemon:
+        await daemon.stop()
     scheduler.shutdown()
     await engine.dispose()
     logging.info("🦀 CrabRes shut down")
