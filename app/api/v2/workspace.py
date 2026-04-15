@@ -15,9 +15,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workspace", tags=["Workspace"])
 
 # workspace 根目录
-# Pipeline 中: workspace = Path(memory.base_dir).parent / "workspace" = .crabres/memory/workspace
-# 这里保持一致
-WORKSPACE_BASE = Path(".crabres/memory/workspace")
+# 优先使用 Render Disk 持久化路径（部署后文件不丢失）
+# 如果没有 Render Disk，降级到容器内路径（部署后会丢失）
+import os as _os
+_render_disk = _os.environ.get("RENDER_DISK_PATH", "")
+if _render_disk:
+    WORKSPACE_BASE = Path(_render_disk) / "workspace"
+    WORKSPACE_FALLBACK = Path(".crabres/memory/workspace")  # 容器内备用
+else:
+    WORKSPACE_BASE = Path(".crabres/memory/workspace")
+    WORKSPACE_FALLBACK = None
+
+# 确保目录存在
+WORKSPACE_BASE.mkdir(parents=True, exist_ok=True)
 
 
 def _safe_path(rel_path: str) -> Path:
@@ -33,7 +43,18 @@ async def list_files(path: str = Query("", description="子目录路径")):
     """列出 workspace 中的文件和目录"""
     target = _safe_path(path)
     if not target.exists():
-        return {"files": [], "path": path}
+        # 尝试从容器内路径恢复（Render Disk 可能还没同步）
+        if WORKSPACE_FALLBACK:
+            fallback_target = (WORKSPACE_FALLBACK / path).resolve()
+            if fallback_target.exists():
+                import shutil
+                target.parent.mkdir(parents=True, exist_ok=True)
+                if fallback_target.is_dir():
+                    shutil.copytree(fallback_target, target, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(fallback_target, target)
+        if not target.exists():
+            return {"files": [], "path": path}
 
     items = []
     try:

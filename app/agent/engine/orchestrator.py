@@ -237,6 +237,8 @@ class Orchestrator:
                 "is_self": True,
                 "url": "https://crab-researcher.vercel.app",
             }
+            # 🔥 解析用户指定的目标平台
+            ctx.product_info["target_platforms"] = self._detect_target_platforms(msg)
             return
 
         # 弱信号：其他产品描述
@@ -247,6 +249,7 @@ class Orchestrator:
             existing = ctx.product_info or {}
             existing["raw_description"] = msg
             existing["updated_at"] = time.time()
+            existing["target_platforms"] = self._detect_target_platforms(msg)
             ctx.product_info = existing
             await self.memory.save("product", existing)
             return
@@ -314,22 +317,35 @@ class Orchestrator:
         product_name = ctx.product_info.get("name", "")
         product_url = ctx.product_info.get("url", "")
 
-        # --- 确定性搜索 1: 产品市场 ---
-        search_query = f"{product_name} {product_desc[:80]} competitors market" if product_name else f"{product_desc[:100]} competitors market analysis"
+        # --- 确定性搜索 1: 产品竞品分析 ---
+        # 🔥 搜索查询要简洁精准，不要把整个产品描述塞进去
+        target_platforms = ctx.product_info.get("target_platforms", [])
+        platform_str = " ".join(target_platforms[:2]) if target_platforms else ""
+        
+        if product_name:
+            search_query = f"{product_name} AI growth tool alternatives competitors 2024"
+        else:
+            search_query = f"{product_desc[:60]} competitors market analysis"
+        
         result = await self._safe_tool_call("web_search", {"query": search_query, "num_results": 5})
         if result and not result.get("error"):
             ctx.search_results.append({"tool": "web_search", "query": search_query, "result": result})
             ctx.tool_call_count += 1
 
-        # --- 确定性搜索 2: 社媒讨论 ---
+        # --- 确定性搜索 2: 目标平台的增长策略 ---
         if ctx.tool_call_count < self.MAX_RESEARCH_TOOL_CALLS:
-            social_query = product_name or product_desc[:60]
+            if target_platforms:
+                # 用户指定了目标平台 → 搜索该平台的增长策略
+                platform_query = f"{product_name or 'SaaS'} growth strategy {' '.join(target_platforms)} indie developer"
+            else:
+                platform_query = f"{product_name or product_desc[:40]} indie developer growth strategy reddit twitter"
+            
             social_result = await self._safe_tool_call("social_search", {
-                "query": social_query,
+                "query": platform_query,
                 "platforms": ["reddit", "x", "hackernews"],
             })
             if social_result and not social_result.get("error"):
-                ctx.search_results.append({"tool": "social_search", "query": social_query, "result": social_result})
+                ctx.search_results.append({"tool": "social_search", "query": platform_query, "result": social_result})
                 ctx.tool_call_count += 1
 
         # --- 确定性浏览: 如果有 URL，用浏览器打开 ---
@@ -346,7 +362,7 @@ class Orchestrator:
             yield {"type": "status", "content": f"Browsing {url[:60]}..."}
             # 推送浏览器开始事件给前端 Browser 面板
             yield {"type": "browser_event", "action": "navigating", "url": url}
-            browse_result = await self._safe_tool_call("browse_website", {"url": url}, timeout=45.0)
+            browse_result = await self._safe_tool_call("browse_website", {"url": url}, timeout=90.0)
             if browse_result and not browse_result.get("error"):
                 ctx.browse_results.append({"url": url, "result": browse_result})
                 ctx.tool_call_count += 1
@@ -414,6 +430,18 @@ class Orchestrator:
 
         # 构建专家任务
         lang = "Chinese" if ctx.language == "zh" else "English"
+        target_platforms = ctx.product_info.get("target_platforms", [])
+        platform_instruction = ""
+        if target_platforms:
+            platform_instruction = (
+                f"\n\n## TARGET PLATFORMS (user specified): {', '.join(target_platforms)}\n"
+                f"Focus your analysis on these platforms ONLY. Do not suggest other platforms.\n"
+                f"CRITICAL: 'X' or 'x' = X/Twitter (formerly Twitter), NOT 小红书.\n"
+                f"Write content templates in the platform's native language:\n"
+                f"- Reddit/X/Twitter/ProductHunt/HackerNews → English\n"
+                f"- 小红书/微博/知乎 → Chinese\n"
+            )
+        
         task = (
             f"Analyze this product and create a growth strategy based on the research data. "
             f"Respond in {lang} for explanations, but write any content drafts/templates "
@@ -421,6 +449,7 @@ class Orchestrator:
             f"Product: {json.dumps(ctx.product_info, ensure_ascii=False, default=str)[:500]}\n\n"
             f"Research data:\n{research_summary}\n\n"
             f"User request: {ctx.user_message}"
+            f"{platform_instruction}"
         )
 
         # 分批执行（依赖关系）
@@ -567,6 +596,23 @@ RULES:
         yield {"type": "status", "content": "Preparing deliverables..."}
 
         try:
+            # 确保 workspace 目录在持久化路径上
+            # Render Disk 挂载到 /data 时，文件不会在部署后丢失
+            import os
+            persistent_base = os.environ.get("RENDER_DISK_PATH", "")
+            if persistent_base:
+                workspace_path = Path(persistent_base) / "workspace"
+                workspace_path.mkdir(parents=True, exist_ok=True)
+                # 同步到持久化路径
+                import shutil
+                src_workspace = Path(".crabres/memory/workspace")
+                if src_workspace.exists():
+                    for f in src_workspace.rglob("*"):
+                        if f.is_file():
+                            dest = workspace_path / f.relative_to(src_workspace)
+                            dest.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.copy2(f, dest)
+            
             deliverables = await self.loop._generate_deliverables(
                 context={
                     "product": ctx.product_info,
@@ -693,6 +739,81 @@ Return ONLY a JSON array of strings, e.g., ["query1", "query2"]. No explanation.
         
         return "\n\n".join(parts) if parts else "No research data available."
 
+    def _detect_target_platforms(self, message: str) -> list[str]:
+        """从用户消息中提取目标平台"""
+        msg_lower = message.lower()
+        platforms = []
+        
+        # 平台名称映射（用户可能用的各种说法）
+        platform_map = {
+            # X/Twitter
+            "twitter": "X/Twitter",
+            "x平台": "X/Twitter",
+            "推特": "X/Twitter",
+            # 注意：单独的 "x" 需要上下文判断
+            
+            # Reddit
+            "reddit": "Reddit",
+            
+            # 小红书
+            "小红书": "小红书",
+            "xiaohongshu": "小红书",
+            "xhs": "小红书",
+            "red note": "小红书",
+            "rednote": "小红书",
+            
+            # Product Hunt
+            "product hunt": "Product Hunt",
+            "producthunt": "Product Hunt",
+            "ph": "Product Hunt",
+            
+            # Hacker News
+            "hacker news": "Hacker News",
+            "hackernews": "Hacker News",
+            "hn": "Hacker News",
+            
+            # LinkedIn
+            "linkedin": "LinkedIn",
+            "领英": "LinkedIn",
+            
+            # 微博
+            "微博": "微博",
+            "weibo": "微博",
+            
+            # 知乎
+            "知乎": "知乎",
+            "zhihu": "知乎",
+            
+            # YouTube
+            "youtube": "YouTube",
+            "油管": "YouTube",
+            
+            # 抖音/TikTok
+            "抖音": "抖音/TikTok",
+            "tiktok": "抖音/TikTok",
+            "douyin": "抖音/TikTok",
+        }
+        
+        for keyword, platform in platform_map.items():
+            if keyword in msg_lower and platform not in platforms:
+                platforms.append(platform)
+        
+        # 特殊处理：单独的 "x" 在增长/策略上下文中 = X/Twitter
+        # "针对x的增长策略" / "在x上推广" / "x platform"
+        import re
+        x_patterns = [
+            r"针对\s*x\s*的", r"在\s*x\s*上", r"x\s*platform",
+            r"x\s*增长", r"x\s*策略", r"x\s*推广",
+            r"for\s+x", r"on\s+x", r"x\s+growth",
+        ]
+        if "X/Twitter" not in platforms:
+            for pattern in x_patterns:
+                if re.search(pattern, msg_lower):
+                    platforms.append("X/Twitter")
+                    break
+        
+        return platforms
+
     def _detect_product_info(self, message: str) -> bool:
         """检测消息是否包含产品信息（复用 loop 的逻辑）"""
         return self.loop._detect_product_info(message)
@@ -756,8 +877,20 @@ Answer naturally and warmly. 2-3 sentences max. Then ask what they're building."
 ## User Request
 {ctx.user_message}
 
+## Target Platforms (user specified)
+{', '.join(ctx.product_info.get('target_platforms', [])) or 'Not specified — suggest based on product type'}
+
 ## Product Info
-{json.dumps(ctx.product_info, ensure_ascii=False, default=str)[:500]}"""
+{json.dumps(ctx.product_info, ensure_ascii=False, default=str)[:500]}
+
+## PLATFORM-SPECIFIC RULES
+- If user specified target platforms, focus ALL playbooks on those platforms
+- "X" or "x" means X/Twitter (formerly Twitter), NOT 小红书
+- Reddit: English-only community, posts MUST be in English
+- X/Twitter: English for global audience, Chinese only if targeting Chinese market
+- 小红书: Chinese-only platform, posts MUST be in Chinese with 小红书 style (emoji-heavy, 种草风格)
+- Product Hunt: English-only
+- Hacker News: English-only, technical audience"""
 
     def _fallback_reply(self, ctx: OrchestratorContext, error: str) -> str:
         """兜底回复"""

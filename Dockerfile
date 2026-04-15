@@ -11,13 +11,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 不在构建时安装 Chromium - 运行时按需安装节省内存
-# RUN python3 -m patchright install chromium
+# 构建时预安装 Chromium（避免运行时安装的 60-120s 延迟）
+# 这只增加镜像大小，不增加运行时内存（浏览器按需启动+用完释放）
+RUN python3 -m patchright install chromium
 
 COPY . .
 
 # 创建数据目录
-RUN mkdir -p .crabres/memory .crabres/skills .crabres/crawl .crabres/notifications
+RUN mkdir -p .crabres/memory .crabres/skills .crabres/crawl .crabres/notifications /data/workspace
 
 
 

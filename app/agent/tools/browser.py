@@ -48,15 +48,21 @@ async def _get_browser(auto_install: bool = True):
         logger.info("Browser initialized with Patchright (anti-detection)")
         return _browser
     except Exception as e:
-        # Chromium 未安装 — 尝试自动安装
+        # Chromium 未安装 — 尝试自动安装（但限时 60s，超时直接降级）
         if auto_install and "executable doesn't exist" in str(e).lower():
-            logger.info("Chromium not found, installing on-demand...")
+            logger.info("Chromium not found, attempting quick install (60s limit)...")
             try:
                 import subprocess
-                subprocess.run(['python3', '-m', 'patchright', 'install', 'chromium'],
-                               check=True, timeout=120)
-                logger.info("Chromium installed successfully, retrying...")
+                proc = subprocess.run(
+                    ['python3', '-m', 'patchright', 'install', 'chromium'],
+                    check=True, timeout=60,
+                    capture_output=True, text=True,
+                )
+                logger.info(f"Chromium installed: {proc.stdout[-200:] if proc.stdout else 'ok'}")
                 return await _get_browser(auto_install=False)
+            except subprocess.TimeoutExpired:
+                logger.warning("Chromium install timed out (60s) — falling back to httpx")
+                return None
             except Exception as install_err:
                 logger.warning(f"Auto-install Chromium failed: {install_err}")
                 return None
@@ -189,7 +195,7 @@ class BrowseWebsiteTool(BaseTool):
             if screenshot:
                 screenshot_bytes = await page.screenshot(full_page=False, type="png")
                 # 存到 workspace
-                workspace = Path(".crabres/workspace/assets")
+                workspace = Path(".crabres/memory/workspace/assets")
                 workspace.mkdir(parents=True, exist_ok=True)
                 import hashlib
                 filename = f"screenshot_{hashlib.md5(url.encode()).hexdigest()[:8]}.png"
