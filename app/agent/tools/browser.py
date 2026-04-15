@@ -26,30 +26,59 @@ _browser = None
 _engine_name = "none"
 
 
-async def _get_browser():
-    """延迟初始化浏览器（单例）
+async def _get_browser(auto_install: bool = True):
+    """延迟初始化浏览器（按需启动）
     
-    优先级：Patchright（反检测分支）> Playwright > None（降级 httpx）
-    Patchright 修改了 CDP 协议特征，能绕过大部分 Bot Detection。
+    Render 免费版只有 512MB 内存，不能常驻 Chromium。
+    策略：首次调用时检查 Chromium，未安装则自动安装，用完后调 _release_browser 释放。
     """
     global _playwright, _browser, _engine_name
     if _browser:
         return _browser
 
-    # 优先尝试 Patchright（反检测版 Playwright）
     try:
         from patchright.async_api import async_playwright
         _playwright = await async_playwright().start()
         _browser = await _playwright.chromium.launch(
             headless=True,
-            args=['--no-sandbox', '--disable-dev-shm-usage'],
+            args=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
+                  '--single-process', '--no-zygote'],
         )
         _engine_name = "patchright"
-        logger.info("🛡️ Browser initialized with Patchright (anti-detection)")
+        logger.info("Browser initialized with Patchright (anti-detection)")
         return _browser
     except Exception as e:
+        # Chromium 未安装 — 尝试自动安装
+        if auto_install and "executable doesn't exist" in str(e).lower():
+            logger.info("Chromium not found, installing on-demand...")
+            try:
+                import subprocess
+                subprocess.run(['python3', '-m', 'patchright', 'install', 'chromium'],
+                               check=True, timeout=120)
+                logger.info("Chromium installed successfully, retrying...")
+                return await _get_browser(auto_install=False)
+            except Exception as install_err:
+                logger.warning(f"Auto-install Chromium failed: {install_err}")
+                return None
         logger.warning(f"No browser engine available (patchright failed: {e})")
         return None
+
+
+async def _release_browser():
+    """释放浏览器进程，回收内存（Render 512MB 限制）"""
+    global _playwright, _browser, _engine_name
+    try:
+        if _browser:
+            await _browser.close()
+        if _playwright:
+            await _playwright.stop()
+    except Exception as e:
+        logger.warning(f"Browser release error: {e}")
+    finally:
+        _browser = None
+        _playwright = None
+        _engine_name = "none"
+        logger.info("Browser released to free memory")
 
 
 class BrowseWebsiteTool(BaseTool):
@@ -195,6 +224,9 @@ class BrowseWebsiteTool(BaseTool):
             result["browse_error"] = str(e)[:200]
             result["note"] = "Playwright failed, fell back to httpx scrape"
             return result
+        finally:
+            # Render 512MB 限制：用完立即释放浏览器进程
+            await _release_browser()
 
     async def _analyze_screenshot(self, screenshot_bytes: bytes, url: str, title: str) -> Optional[str]:
         """

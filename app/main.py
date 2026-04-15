@@ -117,9 +117,8 @@ async def lifespan(app: FastAPI):
         logging.info("📱 Telegram poller skipped (no TELEGRAM_BOT_TOKEN)")
     app.state.telegram_poller = tg_poller
 
-    # Playwright 浏览器预热（后台异步，不阻塞启动）
-    import asyncio
-    asyncio.create_task(_warmup_browser())
+    # 浏览器不再预热 — 按需启动，用完释放（Render 512MB 限制）
+    logging.info("Browser: on-demand mode (will install + launch when needed)")
 
     logging.info("🦀 CrabRes Agent Engine started!")
     yield

@@ -1,14 +1,11 @@
 services:
   - type: web
     name: crab-researcher-api
-    runtime: python
+    runtime: docker
     region: oregon
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    dockerfilePath: ./Dockerfile
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.12.3"
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET
