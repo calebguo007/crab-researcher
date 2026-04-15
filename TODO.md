@@ -79,13 +79,13 @@
 
 ## 🟡 P1 — 后续迭代
 
-- [ ] Docker 沙箱（Agent 执行代码不污染主机）
-- [ ] Redis 生产部署
-- [ ] 前端 SSE 实时展示通知
-- [ ] 前端 Dashboard 对接 /api/goals + /api/reports/weekly
-- [ ] 前端 Autonomous 审批界面
+- [x] Docker 沙箱（Dockerfile 完善 + Playwright + 健康检查）
+- [x] Redis 生产部署（docker-compose 自动注入 REDIS_URL）
+- [x] 前端 SSE 实时展示通知（Dashboard SSE 连接）
+- [x] 前端 Dashboard 对接 /api/goals + /api/reports/weekly + /api/notifications
+- [x] 前端 Autonomous 审批界面（Dashboard Approvals Tab）
 - [ ] 微信 / 飞书 Bot 配置完善
-- [ ] 更多 Seed Skills
+- [x] 更多 Seed Skills（10 个，+5 新增：Reddit AMA/LinkedIn/TikTok/Email Drip/IH Launch）
 
 ---
 

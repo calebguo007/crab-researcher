@@ -14,10 +14,11 @@ interface SurfaceProps {
   creature: CreatureState
   onChat: () => void
   onPlan: () => void
+  onDashboard?: () => void
   onSettings?: () => void
 }
 
-export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) {
+export function Surface({ creature, onChat, onPlan, onDashboard, onSettings }: SurfaceProps) {
   const greeting = getGreeting(creature)
   const [discoveries, setDiscoveries] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
@@ -159,8 +160,12 @@ export function Surface({ creature, onChat, onPlan, onSettings }: SurfaceProps) 
         </div>
       )}
 
-      {/* Growth Plan 入口 */}
-      <div className="w-full mb-8">
+      {/* Dashboard + Growth Plan */}
+      <div className="w-full space-y-2 mb-8">
+        <button onClick={onDashboard}
+          className="w-full py-3 rounded-xl border border-brand/20 text-sm font-medium text-brand hover:bg-brand/5 transition-all flex items-center justify-center gap-2">
+          <span>📊</span> Agent Dashboard
+        </button>
         <button onClick={onPlan}
           className="w-full py-3 rounded-xl border border-border text-sm font-medium text-primary hover:bg-hover transition-all">
           {t('surface.plan')}

@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react'
 import { Surface } from './pages/Surface'
 import { Chat } from './pages/Chat'
 import { Plan } from './pages/Plan'
+import { Dashboard } from './pages/Dashboard'
 import { Onboarding } from './pages/Onboarding'
 import { Landing } from './pages/Landing'
 import { Compare } from './pages/Compare'
@@ -159,7 +160,7 @@ export default function App() {
   const [showAuth, setShowAuth] = useState(false)
   const [showCompare, setShowCompare] = useState(false)
   const [onboarded, setOnboarded] = useState(!!localStorage.getItem('crabres_onboarded'))
-  const [page, setPage] = useState<'surface' | 'chat' | 'plan' | 'settings'>('surface')
+  const [page, setPage] = useState<'surface' | 'chat' | 'plan' | 'dashboard' | 'settings'>('surface')
   const [userId, setUserId] = useState('default')
   const [creature, setCreature] = useState<CreatureState>(() =>
     generateCreature('default', 'saas')
@@ -246,6 +247,10 @@ export default function App() {
     return <Plan creature={creature} onBack={() => setPage('surface')} />
   }
 
+  if (page === 'dashboard') {
+    return <Dashboard creature={creature} onBack={() => setPage('surface')} />
+  }
+
   if (page === 'settings') {
     return <Settings creature={creature} onBack={() => setPage('surface')} onLogout={() => { setAuthed(false); setOnboarded(false) }} />
   }
@@ -255,6 +260,7 @@ export default function App() {
       creature={creature}
       onChat={() => setPage('chat')}
       onPlan={() => setPage('plan')}
+      onDashboard={() => setPage('dashboard')}
       onSettings={() => setPage('settings')}
     />
   )
