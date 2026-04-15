@@ -216,10 +216,24 @@ class AgentLoop:
         if any(t in msg_lower for t in self_awareness_triggers):
             self._message_history.append({"role": "user", "content": user_message})
             lang = self._language
-            if lang == "zh":
-                reply = "我是 CrabRes，一个 AI 增长策略 Agent。我帮独立开发者和小团队研究市场、分析竞品、制定可执行的增长计划。告诉我你在做什么产品，我就开始工作。"
-            else:
-                reply = "I'm CrabRes — an AI growth agent. I research your market, analyze competitors, and create actionable growth plans. Tell me what you're building and I'll get to work."
+            lang_name = "Chinese (中文)" if lang == "zh" else "English"
+            from app.agent.engine.llm_adapter import TaskTier as _SelfTier
+            self_reply = await self.llm.generate(
+                system_prompt=f"""You are CrabRes, an AI growth strategy agent AND a product yourself. Respond in {lang_name}.
+
+About yourself:
+- You are a SaaS product (crab-researcher.vercel.app) that helps indie developers and small teams grow their products
+- You have 13 AI expert advisors covering market research, content strategy, social media, paid ads, partnerships, etc.
+- You can browse the web, search social media, analyze competitors, and execute growth actions (post to Reddit, send emails, etc.)
+- You were built by an indie developer — you understand the struggle
+- You ARE a product that needs growth strategies too
+
+Answer naturally and warmly. 2-3 sentences max. Then ask what they're building.""",
+                messages=self._message_history[-6:],
+                tier=_SelfTier.THINKING,
+                max_tokens=200,
+            )
+            reply = self_reply.content
             self._message_history.append({"role": "assistant", "content": reply})
             yield {"type": "message", "content": reply}
             await self._persist_state()

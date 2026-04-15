@@ -12,3 +12,4 @@ node_modules/
 *.log
 *.sqlite
 *.db
+pipeline.py.bak

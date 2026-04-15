@@ -218,6 +218,37 @@ class PipelineRunner:
         self.state.product_info.update(product_info)
         await self.memory.save("product", self.state.product_info)
 
+        # 🔥 信息充分度检测：如果产品信息太模糊，先追问而不是生成垃圾 Playbook
+        has_name = bool(product_info.get("name") and product_info["name"] != "product")
+        has_desc = bool(product_info.get("description") and len(product_info.get("description", "")) > 20)
+        has_type = bool(product_info.get("type"))
+        is_self = product_info.get("is_self", False)
+        info_score = sum([has_name, has_desc, has_type, is_self])
+
+        if info_score < 2 and not is_self and self.state.ask_count < 1:
+            # 信息不够，用 LLM 生成一个自然的追问（不是硬编码）
+            self.state.ask_count += 1
+            lang = "Chinese" if self._language == "zh" else "English"
+            from app.agent.engine.llm_adapter import TaskTier
+            clarify = await self.llm.generate(
+                system_prompt=f"""You are CrabRes. The user gave you a product description but it's too vague to create a useful growth plan. 
+Ask ONE specific question to get the most critical missing info. Respond in {lang}.
+Be warm and casual, not robotic. Don't list multiple questions — just ONE.
+Examples of good questions:
+- "Cool! What does [product] actually do? Like, what's the one-sentence pitch?"
+- "Got it — who's the target user? Developers? Designers? Small business owners?"
+- "Interesting! What's the main problem it solves?"
+Do NOT say "Could you provide more details" — be specific about what you need.""",
+                messages=self.state.message_history[-4:],
+                tier=TaskTier.PARSING,
+                max_tokens=150,
+            )
+            reply = clarify.content
+            yield {"type": "message", "content": reply}
+            self.state.message_history.append({"role": "assistant", "content": reply})
+            await self._persist()
+            return
+
         # Step 2: RESEARCH
         yield {"type": "status", "content": "Researching your market..."}
         research_results = await self._step_research(self.state.product_info)
@@ -258,9 +289,55 @@ class PipelineRunner:
 
     # ========== 流水线步骤 ==========
 
+    # CrabRes 自身的产品信息（硬编码，用于自我认知场景）
+    CRABRES_PRODUCT_INFO = {
+        "name": "CrabRes",
+        "description": "AI growth strategy agent that helps indie developers and small teams research markets, analyze competitors, and execute actionable growth plans",
+        "type": "saas",
+        "audience": "indie developers, solo founders, small SaaS teams (1-5 people)",
+        "goal": "acquire first 1000 users through organic channels",
+        "budget": "$0",
+        "url": "https://crab-researcher.vercel.app",
+        "features": [
+            "13 AI expert advisors (market researcher, content strategist, social media, etc.)",
+            "Real-time web research and competitor analysis",
+            "Automated content drafting (Reddit, Twitter/X, email)",
+            "Structured Growth Playbooks with step-by-step execution",
+            "Browser automation for deep scraping",
+            "Execution engine that actually posts/sends (not just suggests)",
+        ],
+        "competitors": [
+            {"name": "GrowthBook", "focus": "A/B testing and feature flags"},
+            {"name": "Jasper", "focus": "AI copywriting"},
+            {"name": "Copy.ai", "focus": "AI marketing copy"},
+            {"name": "Writesonic", "focus": "AI content generation"},
+        ],
+        "differentiator": "Not just AI copywriting — full research + strategy + execution pipeline. CrabRes is an employee, not a tool.",
+        "search_keywords": ["AI growth agent", "SaaS marketing automation", "indie developer growth tool", "AI competitor analysis", "automated growth strategy"],
+    }
+
+    def _is_self_referencing(self, msg: str) -> bool:
+        """检测用户是否在说 CrabRes 自身"""
+        msg_lower = msg.lower()
+        triggers = [
+            "crabres", "crab-res", "crab res", "你自己", "你本身",
+            "你是一个产品", "你是产品", "给你自己", "为你自己",
+            "for yourself", "about yourself", "your own", "you are a product",
+            "my project is you", "the product is you",
+        ]
+        return any(t in msg_lower for t in triggers)
+
     async def _step_understand(self, user_message: str) -> dict:
         """Step 1: 从用户消息提取产品信息"""
         from app.agent.engine.llm_adapter import TaskTier
+
+        # 🔥 自我认知：如果用户说的是 CrabRes 自己，直接注入硬编码产品信息
+        if self._is_self_referencing(user_message):
+            info = dict(self.CRABRES_PRODUCT_INFO)
+            info["raw_description"] = user_message
+            info["is_self"] = True
+            logger.info("Self-referencing detected: injecting CrabRes product info")
+            return info
 
         # 如果消息够长且包含产品信号，让 LLM 提取结构化信息
         if len(user_message) > 30 and self._has_product_signals(user_message.lower()):
@@ -444,9 +521,19 @@ class PipelineRunner:
         budget = product_info.get("budget", "")
         channel_advice = get_actionable_advice(product_type, budget)
 
+        # 🔥 自我认知注入
+        self_note = ""
+        if product_info.get("is_self"):
+            self_note = """
+IMPORTANT: You ARE CrabRes. The user asked you to create a growth strategy for YOURSELF.
+Be self-aware and enthusiastic — you're analyzing your own market and competitors.
+Reference your own features, your own differentiators, your own target audience.
+Don't say "your product" — say "we" or "CrabRes" or "our tool".
+"""
+
         response = await self.llm.generate(
             system_prompt=f"""You are CrabRes, an AI growth agent. Respond ONLY in {lang}.
-
+{self_note}
 You have research data and expert opinions. Write a response like you're talking to a friend who asked for help.
 
 STRICT FORMAT RULES:
@@ -581,54 +668,102 @@ Base it on the strategy and research data provided.""",
         try:
             from app.agent.engine.llm_adapter import TaskTier as _TaskTier
             from app.agent.memory.playbooks import PlaybookStore, parse_playbook_from_llm
+            from app.agent.knowledge.channel_playbooks import get_channels_for_product, get_channel_sop
+            from app.agent.knowledge.playbook_templates import COMMUNITY_GROWTH_TEMPLATE
+
+            # 🔥 注入产品类型对应的渠道 SOP（具体到 subreddit、发帖时间、模板）
+            p_type = product_info.get("type", "saas")
+            channels = get_channels_for_product(p_type)
+            channel_sops = ""
+            for ch_key in channels[:3]:
+                sop = get_channel_sop(ch_key)
+                if sop:
+                    channel_sops += f"\n### {sop.get('name', ch_key)}\n"
+                    channel_sops += f"Why: {sop.get('why', '')}\n"
+                    channel_sops += "Quick start:\n"
+                    for task in sop.get('quick_start', [])[:4]:
+                        channel_sops += f"  - {task}\n"
+                    channel_sops += f"Post template title: {sop.get('template_title', '')}\n"
+                    channel_sops += f"Post template body: {sop.get('template_body', '')}\n"
+                    channel_sops += f"Good metrics: {sop.get('good_metrics', '')}\n"
+                    channel_sops += f"Don't: {', '.join(sop.get('dont', [])[:3])}\n"
+
+            # 🔥 注入模板结构作为 few-shot（用 Community Growth 模板做示例）
+            import json as _json
+            example_step = COMMUNITY_GROWTH_TEMPLATE["phases"][0]["steps"][0]
+            few_shot_example = _json.dumps(example_step, ensure_ascii=False, indent=2)
+
+            # 🔥 自我认知注入
+            self_aware_note = ""
+            if product_info.get("is_self"):
+                self_aware_note = """
+IMPORTANT: The product is CrabRes ITSELF — an AI growth agent (crab-researcher.vercel.app).
+You ARE the product. Create a growth plan for yourself. Be specific:
+- Competitors: GrowthBook (A/B testing), Jasper (AI copywriting), Copy.ai (AI marketing), Writesonic
+- Target: indie developers, solo founders on Reddit (r/SideProject, r/indiehackers, r/SaaS), X (#buildinpublic, #indiehackers), Hacker News (Show HN)
+- Differentiator: Not just AI copywriting — full research + strategy + execution pipeline
+- Budget: $0 (organic only)
+- Key angle: 'I built an AI that doesn\'t just give advice — it actually executes growth strategies for you'"""
 
             playbook_json = await self.llm.generate(
                 system_prompt=f"""Generate a structured growth playbook in JSON format. Language: {lang}.
+{self_aware_note}
 
-CRITICAL RULES FOR INDIE DEVELOPERS:
-- This is for a solo developer or tiny team (1-3 people)
-- Budget should be realistic: $0-$100 per step, not $500-$1000
-- Time should be realistic: "2 hours" not "5 days"
-- Steps must be IMMEDIATELY actionable: "Post in r/SideProject with this exact format..." not "Conduct market research"
-- Include SPECIFIC platforms, subreddits, communities, hashtags, templates
-- Every step should have a concrete deliverable the developer can check off
-- NO generic advice like "Create a brand identity" or "Develop a marketing strategy"
-- YES specific actions like "Write a Show HN post: title format '[Show HN] I built X to solve Y', body: 3 paragraphs max"
+CRITICAL RULES — VIOLATION = FAILURE:
+1. This is for a solo developer or tiny team (1-3 people) with $0 total budget
+2. Every step budget MUST be $0. If a step costs money, remove it or find a free alternative
+3. Every step duration MUST be under 4 hours. "2 hours" is good. "5 days" is WRONG
+4. Steps MUST name SPECIFIC platforms with SPECIFIC details:
+   - Reddit: exact subreddit names (r/SideProject, r/indiehackers), exact post title format, body template
+   - Twitter/X: exact hashtags (#buildinpublic, #indiehackers), thread format, hook formula
+   - HN: "Show HN: [product] — [one-line benefit]" format
+   - Email: subject line template, 3-paragraph body structure
+5. NO generic steps like "Create brand identity", "Develop marketing strategy", "Secure funding", "Draft business plan"
+6. NO steps requiring paid tools (no Adobe, no paid software, no ad spend)
+7. Every step MUST produce a concrete deliverable: a written post, a published thread, a sent email
+8. Use the CHANNEL SOPs below as source material — copy their specific tactics into steps
+
+## CHANNEL SOPs (use these specific tactics in your steps)
+{channel_sops}
+
+## EXAMPLE OF A GOOD STEP (follow this level of specificity)
+{few_shot_example}
 
 Return ONLY valid JSON with this exact structure:
 {{
-  "name": "Playbook name",
+  "name": "Playbook name (specific, e.g. 'Reddit + Show HN Launch Sprint')",
   "description": "One sentence",
-  "suitable_for": "Who this is for",
-  "total_budget": "$X",
-  "expected_timeline": "X weeks",
-  "expected_results": "What to expect",
+  "suitable_for": "Solo developer / tiny team with $0 budget",
+  "total_budget": "$0",
+  "expected_timeline": "4 weeks",
+  "expected_results": "Specific expected outcome with numbers (e.g. '50-200 signups, 3 viral posts')",
   "risk_factors": ["risk1", "risk2"],
   "priority": 1,
   "phases": [
     {{
       "name": "Phase name",
-      "duration": "Day 1-7",
+      "duration": "Day 1-3",
       "steps": [
         {{
           "order": 1,
-          "title": "Step title",
-          "detail": "3-5 sentences of SPECIFIC instructions with exact platforms, formats, and templates",
-          "tools": ["tool1"],
+          "title": "Step title (action verb + specific target, e.g. 'Post experience share in r/SideProject')",
+          "detail": "3-5 sentences: WHAT to do, WHERE exactly, WHAT FORMAT, WHAT TEMPLATE to use. Include the actual post title format and body structure.",
+          "tools": ["free tool only"],
           "budget": "$0",
-          "duration": "30 min",
-          "output": "What this step produces",
-          "success_criteria": "How to know it worked",
-          "common_mistakes": ["mistake1"]
+          "duration": "2 hours",
+          "output": "Concrete deliverable (e.g. '1 published Reddit post')",
+          "success_criteria": "Measurable outcome (e.g. '>20 upvotes within 24h')",
+          "common_mistakes": ["specific mistake with explanation"]
         }}
       ]
     }}
   ]
 }}
-Create 3 phases with 4-5 steps each. Phase 1: Launch Prep (Day 1-3), Phase 2: Distribution Blitz (Day 4-14), Phase 3: Iterate & Scale (Day 15-30).""",
+Create 3 phases: Phase 1: Setup & First Post (Day 1-3, 4 steps), Phase 2: Distribution Blitz (Day 4-14, 5-6 steps), Phase 3: Iterate & Double Down (Day 15-30, 4-5 steps).
+12-15 steps total.""",
                 messages=[{"role": "user", "content": f"Product: {product_desc}\n\nStrategy: {strategy_response[:1000]}"}],
-                tier=_TaskTier.THINKING,
-                max_tokens=2500,
+                tier=_TaskTier.CRITICAL,
+                max_tokens=4000,
             )
             
             # Parse and save
