@@ -2,6 +2,7 @@
  * Landing Page — Warm, premium, focused
  */
 
+import { useEffect } from 'react'
 import PixFrontImg from '../assets/pix_fronted.png'
 import { EXPERTS } from '../lib/experts'
 
@@ -12,6 +13,12 @@ interface LandingProps {
 }
 
 export function Landing({ onGetStarted, onLogin }: LandingProps) {
+  // 用户打开 Landing Page 时预热后端（Render 免费版冷启动 30-60s）
+  useEffect(() => {
+    const API = import.meta.env.VITE_API_BASE || '/api'
+    fetch(`${API.replace('/api', '')}/`).catch(() => {})
+  }, [])
+
   return (
     <div className="min-h-screen bg-surface">
       {/* Nav */}

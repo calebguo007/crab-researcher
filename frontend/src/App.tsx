@@ -14,7 +14,7 @@ import { Landing } from './pages/Landing'
 import { Compare } from './pages/Compare'
 import { Settings } from './pages/Settings'
 import PixFrontImg from './assets/pix_fronted.png'
-import { getToken, setToken, clearToken, setAuthExpiredHandler, api } from './lib/api'
+import { getToken, setToken, clearToken, setAuthExpiredHandler, setColdStartHandler, api } from './lib/api'
 import { generateCreature } from './components/creature/types'
 import type { CreatureState } from './components/creature/types'
 
@@ -165,9 +165,11 @@ export default function App() {
   const [creature, setCreature] = useState<CreatureState>(() =>
     generateCreature('default', 'saas')
   )
+  const [serverWaking, setServerWaking] = useState(false)
 
   useEffect(() => {
     setAuthExpiredHandler(() => setAuthed(false))
+    setColdStartHandler((waking) => setServerWaking(waking))
     // 初始化暗色模式
     const savedTheme = localStorage.getItem('crabres_theme')
     if (savedTheme === 'dark') {
@@ -212,9 +214,16 @@ export default function App() {
     }).catch(() => {})
   }, [authed, onboarded])
 
+  // 冷启动提示 Banner
+  const ColdStartBanner = serverWaking ? (
+    <div className="fixed top-0 left-0 right-0 z-50 bg-brand/90 text-white text-center py-2 text-sm animate-pulse">
+      🦀 Server is waking up... This may take 30-60 seconds on free tier.
+    </div>
+  ) : null
+
   if (!authed) {
     if (showAuth) {
-      return <AuthPage onLogin={() => { setAuthed(true); setShowAuth(false) }} />
+      return <>{ColdStartBanner}<AuthPage onLogin={() => { setAuthed(true); setShowAuth(false) }} /></>
     }
     if (showCompare) {
       return <Compare onGetStarted={() => { setShowCompare(false); setShowAuth(true) }} onBack={() => setShowCompare(false)} />
