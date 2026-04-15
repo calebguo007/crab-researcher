@@ -163,6 +163,8 @@ class AgentLoop:
                     self._message_history.append({"role": "assistant", "content": f"[Expert: {expert_id}] {expert_output[:1500]}"})
                     self.state.expert_outputs[expert_id] = expert_output
                     yield {"type": "expert_thinking", "expert_id": expert_id, "content": expert_output}
+                    # 专家私聊也需要 yield message 事件，否则 CLI 和前端看不到最终输出
+                    yield {"type": "message", "content": f"**{expert.name}** (@{expert_id}):\n\n{expert_output}"}
                 except Exception as e:
                     yield {"type": "error", "content": f"Expert {expert_id} encountered an error: {str(e)[:200]}"}
                 await self._persist_state()
@@ -965,54 +967,54 @@ The user came here because they're tired of generic advice. Show them what real 
         deliverables = []
         lang = "Chinese" if getattr(self, '_language', 'en') == "zh" else "English"
 
-        # 1. 竞品分析报告
+        # 1-3. 并行生成竞品报告 + 内容草稿 + 30天计划（从串行 ~60s 降到 ~20s）
         tool_results = context.get("tool_results", [])
         research_text = "\n".join(
             f"- {r.get('tool','')}: {_json.dumps(r.get('result',{}), ensure_ascii=False, default=str)[:600]}"
             for r in tool_results[:5]
             if isinstance(r.get("result"), dict) and not r["result"].get("error")
         )
-        if research_text:
-            try:
-                report = await self.llm.generate(
-                    system_prompt=f"Generate a competitor analysis report in {lang}. Be specific — use real names, numbers, URLs from the research data. Format as clean markdown. 500-800 words.",
-                    messages=[{"role": "user", "content": f"Product: {product_desc}\n\nResearch data:\n{research_text}"}],
-                    tier=TaskTier.THINKING, max_tokens=1500,
-                )
-                path = workspace / "reports" / f"competitor_analysis_{product_name.lower().replace(' ','_')}.md"
-                file_content = f"# Competitor Analysis: {product_name}\n\n{report.content}"
-                path.write_text(file_content, encoding="utf-8")
-                deliverables.append({"name": "Competitor Analysis", "desc": f"reports/{path.name}", "path": str(path)})
-            except Exception as e:
-                logger.warning(f"Failed to generate competitor report: {e}")
 
-        # 2. 内容草稿（Reddit + X）
-        try:
+        async def _gen_competitor_report():
+            if not research_text:
+                return None
+            report = await self.llm.generate(
+                system_prompt=f"Generate a competitor analysis report in {lang}. Be specific — use real names, numbers, URLs from the research data. Format as clean markdown. 500-800 words.",
+                messages=[{"role": "user", "content": f"Product: {product_desc}\n\nResearch data:\n{research_text}"}],
+                tier=TaskTier.THINKING, max_tokens=1500,
+            )
+            path = workspace / "reports" / f"competitor_analysis_{product_name.lower().replace(' ','_')}.md"
+            path.write_text(f"# Competitor Analysis: {product_name}\n\n{report.content}", encoding="utf-8")
+            return {"name": "Competitor Analysis", "desc": f"reports/{path.name}", "path": str(path)}
+
+        async def _gen_content_drafts():
             draft = await self.llm.generate(
                 system_prompt=f"Write ready-to-post social media drafts in {lang}. Write TWO versions: 1) Reddit post (title + body, genuine tone, NOT promotional) 2) Twitter/X thread (hook + 3-5 tweets). Use the product name. Sound like a real person.",
                 messages=[{"role": "user", "content": f"Product: {product_desc}\n\nStrategy: {strategy_response[:800]}"}],
                 tier=TaskTier.WRITING, max_tokens=1200,
             )
             path = workspace / "drafts" / f"first_posts_{product_name.lower().replace(' ','_')}.md"
-            file_content = f"# Content Drafts: {product_name}\n\n{draft.content}"
-            path.write_text(file_content, encoding="utf-8")
-            deliverables.append({"name": "Content Drafts (Reddit + X)", "desc": f"drafts/{path.name}", "path": str(path)})
-        except Exception as e:
-            logger.warning(f"Failed to generate content drafts: {e}")
+            path.write_text(f"# Content Drafts: {product_name}\n\n{draft.content}", encoding="utf-8")
+            return {"name": "Content Drafts (Reddit + X)", "desc": f"drafts/{path.name}", "path": str(path)}
 
-        # 3. 30天增长计划
-        try:
+        async def _gen_growth_plan():
             plan = await self.llm.generate(
                 system_prompt=f"Create a 30-day growth plan in {lang}. Format: Week 1/2/3/4, each with 3-4 specific tasks. Be specific: which platform, what content, what time, what metrics.",
                 messages=[{"role": "user", "content": f"Product: {product_desc}\n\nStrategy: {strategy_response[:800]}"}],
                 tier=TaskTier.THINKING, max_tokens=1500,
             )
             path = workspace / "plans" / f"30day_growth_{product_name.lower().replace(' ','_')}.md"
-            file_content = f"# 30-Day Growth Plan: {product_name}\n\n{plan.content}"
-            path.write_text(file_content, encoding="utf-8")
-            deliverables.append({"name": "30-Day Growth Plan", "desc": f"plans/{path.name}", "path": str(path)})
-        except Exception as e:
-            logger.warning(f"Failed to generate growth plan: {e}")
+            path.write_text(f"# 30-Day Growth Plan: {product_name}\n\n{plan.content}", encoding="utf-8")
+            return {"name": "30-Day Growth Plan", "desc": f"plans/{path.name}", "path": str(path)}
+
+        import asyncio as _asyncio
+        parallel_tasks = [_gen_competitor_report(), _gen_content_drafts(), _gen_growth_plan()]
+        parallel_results = await _asyncio.gather(*parallel_tasks, return_exceptions=True)
+        for result in parallel_results:
+            if isinstance(result, dict):
+                deliverables.append(result)
+            elif isinstance(result, Exception):
+                logger.warning(f"Parallel deliverable generation failed: {result}")
 
         # 4. 结构化 Playbook（供 Plan 页面展示）
         try:

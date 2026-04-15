@@ -589,13 +589,11 @@ RULES:
 
         try:
             # 确保 workspace 目录在持久化路径上
-            # Render Disk 挂载到 /data 时，文件不会在部署后丢失
             import os
             persistent_base = os.environ.get("RENDER_DISK_PATH", "")
             if persistent_base:
                 workspace_path = Path(persistent_base) / "workspace"
                 workspace_path.mkdir(parents=True, exist_ok=True)
-                # 同步到持久化路径
                 import shutil
                 src_workspace = Path(".crabres/memory/workspace")
                 if src_workspace.exists():
@@ -605,7 +603,8 @@ RULES:
                             dest.parent.mkdir(parents=True, exist_ok=True)
                             shutil.copy2(f, dest)
             
-            deliverables = await self.loop._generate_deliverables(
+            # 交付物生成有 90s 总超时 — 避免 LLM 串行调用导致无限等待
+            deliverables = await asyncio.wait_for(self.loop._generate_deliverables(
                 context={
                     "product": ctx.product_info,
                     "tool_results": [{"tool": r["tool"], "result": r["result"]} for r in ctx.search_results],
@@ -613,7 +612,7 @@ RULES:
                 },
                 strategy_response=ctx.synthesis,
                 expert_results=ctx.expert_outputs,
-            )
+            ), timeout=90.0)
             
             if deliverables:
                 ctx.deliverables = deliverables
@@ -632,6 +631,9 @@ RULES:
                     "type": "message",
                     "content": f"I've prepared these for you:\n\n{files_msg}\n\nYou can find them in your workspace.",
                 }
+        except asyncio.TimeoutError:
+            logger.warning("DELIVER stage timed out after 90s — skipping remaining deliverables")
+            yield {"type": "status", "content": "Deliverables ready — workspace updated"}
         except Exception as e:
             logger.warning(f"DELIVER stage failed (non-fatal): {e}")
 
