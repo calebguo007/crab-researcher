@@ -118,40 +118,36 @@ class PipelineRunner:
 
         # ========== 快速路径 ==========
 
-        # 1. 自我认知——硬编码，0 token
-        if self._is_self_awareness_question(msg_lower):
-            reply = self._self_awareness_reply()
-            yield {"type": "message", "content": reply}
-            self.state.message_history.append({"role": "assistant", "content": reply})
-            return
-
-        # 2. 纯打招呼——LLM 简短回复，不调工具
+        # 1. 纯打招呼（精确匹配，0 token）
         if self._is_greeting(msg_lower):
-            reply = await self._quick_reply(msg, "The user is greeting you. Reply warmly in 1-2 sentences and ask what they're building.")
+            reply = await self._quick_reply(msg, "The user is greeting you. Reply warmly in 1-2 sentences and ask what they're building or how you can help.")
             yield {"type": "message", "content": reply}
             self.state.message_history.append({"role": "assistant", "content": reply})
             return
 
-        # 3. 简短追问/闲聊——LLM 直接回答
-        if len(msg) < 50 and not self._has_product_signals(msg_lower):
-            # 先检查是否已有产品信息
-            if self.state.product_info:
-                # 有产品信息的追问 → 可能需要进流水线
-                pass
-            else:
-                # 没产品信息的短消息 → 引导
-                self.state.ask_count += 1
-                if self.state.ask_count <= 1:
-                    reply = await self._quick_reply(msg, "The user said something short without product info. Ask ONE friendly question about what they're building. Keep it to 1-2 sentences.")
-                    yield {"type": "message", "content": reply}
-                    self.state.message_history.append({"role": "assistant", "content": reply})
-                    return
-                else:
-                    # 问过了还没给产品信息 → 给兜底
-                    reply = self._fallback_reply()
-                    yield {"type": "message", "content": reply}
-                    self.state.message_history.append({"role": "assistant", "content": reply})
-                    return
+        # 2. 短消息智能路由（用 LLM 判断意图，不再用 len < 50 硬判断）
+        if len(msg) < 80 and not self._has_product_signals(msg_lower):
+            intent = await self._classify_intent(msg)
+            logger.info(f"Intent classification: {intent}")
+
+            if intent == "self_awareness":
+                # 用户在问 CrabRes 自身相关的问题
+                reply = await self._self_aware_reply(msg)
+                yield {"type": "message", "content": reply}
+                self.state.message_history.append({"role": "assistant", "content": reply})
+                return
+            elif intent == "greeting":
+                reply = await self._quick_reply(msg, "The user is greeting you. Reply warmly in 1-2 sentences and ask what they're building.")
+                yield {"type": "message", "content": reply}
+                self.state.message_history.append({"role": "assistant", "content": reply})
+                return
+            elif intent == "chitchat":
+                # 闲聊但不是产品相关 → 友好回复并引导
+                reply = await self._quick_reply(msg, "The user is chatting casually. Reply naturally based on conversation history, then gently steer toward how you can help with growth strategy. Don't repeat the same question if you already asked it.")
+                yield {"type": "message", "content": reply}
+                self.state.message_history.append({"role": "assistant", "content": reply})
+                return
+            # intent == "product" or "followup" → 继续进流水线
 
         # ========== 流水线路径 ==========
         self.state.ask_count = 0
@@ -791,37 +787,42 @@ Rules:
         return response.content
 
     async def _quick_reply(self, user_message: str, instruction: str) -> str:
-        """LLM 简短回复（不调工具，不调专家）"""
+        """LLM 简短回复（不调工具，不调专家，但带完整上下文）"""
         from app.agent.engine.llm_adapter import TaskTier
 
         lang = "Chinese" if self._language == "zh" else "English"
+        
+        # 构建产品上下文（如果有的话）
+        product_ctx = ""
+        if self.state.product_info:
+            product_ctx = f"\nYou already know about the user's product: {json.dumps(self.state.product_info, ensure_ascii=False, default=str)[:300]}"
+
         response = await self.llm.generate(
-            system_prompt=f"You are CrabRes, an AI growth agent that helps developers grow their products. Respond in {lang}. {instruction}",
-            messages=self.state.message_history[-6:],
-            tier=TaskTier.PARSING,  # 最便宜的 tier
-            max_tokens=200,
+            system_prompt=f"""You are CrabRes, an AI growth strategy agent. You are ALSO a product yourself — a SaaS tool that helps indie developers grow their products.
+
+Key facts about yourself:
+- You are CrabRes, built to research markets, analyze competitors, and create actionable growth plans
+- You have 13 AI expert advisors (market researcher, content strategist, social media expert, etc.)
+- You can browse the web, search Reddit/Twitter, and execute growth actions
+- You are a product that needs growth too — you understand the struggle firsthand
+
+Respond in {lang}. {instruction}{product_ctx}""",
+            messages=self.state.message_history[-10:],
+            tier=TaskTier.THINKING,  # 用更好的模型，保证对话质量
+            max_tokens=300,
         )
         return response.content
 
-    # ========== 检测器（纯代码，0 token）==========
-
-    def _is_self_awareness_question(self, msg: str) -> bool:
-        triggers = ["what are you", "who are you", "what do you do",
-                     "introduce yourself", "你是什么", "你是谁", "你做什么", "介绍一下"]
-        return any(t in msg for t in triggers)
-
-    def _self_awareness_reply(self) -> str:
-        if self._language == "zh":
-            return "我是 CrabRes，一个 AI 增长策略 Agent。我帮开发者和小团队研究市场、分析竞品、制定可执行的增长计划。告诉我你在做什么产品，我就开始工作。"
-        return "I'm CrabRes — an AI growth agent. I research your market, analyze competitors, and create actionable growth plans for indie developers and small teams. Tell me what you're building and I'll get to work."
+    # ========== 检测器 ==========
 
     def _is_greeting(self, msg: str) -> bool:
-        greetings = ["hi", "hey", "hello", "sup", "yo", "嗨", "你好", "哈喽", "在吗"]
-        return msg.strip().rstrip("!！.。") in greetings
+        """精确匹配纯打招呼（0 token）"""
+        greetings = ["hi", "hey", "hello", "sup", "yo", "嗨", "你好", "哈喽", "在吗", "hi!", "hello!", "hey!"]
+        return msg.strip().rstrip("!！.。，,") in greetings
 
     def _has_product_signals(self, msg: str) -> bool:
         """检测消息是否包含产品信息（纯代码，0 token）"""
-        if len(msg) < 20:
+        if len(msg) < 15:
             return False
         signals = [
             "my product", "i built", "i made", "i'm building", "we built",
@@ -833,10 +834,68 @@ Rules:
         ]
         return any(s in msg for s in signals)
 
-    def _fallback_reply(self) -> str:
-        if self._language == "zh":
-            return "我需要知道你在做什么才能帮你。给我一句话就行——比如 'AI 简历优化工具，$9.99/月'，我就能立刻开始研究。"
-        return "I need to know what you're building to help. Just a one-liner works — like 'AI resume optimizer at $9.99/mo' — and I'll start researching immediately."
+    async def _classify_intent(self, msg: str) -> str:
+        """用 LLM 对短消息进行意图分类（代替硬编码规则）"""
+        from app.agent.engine.llm_adapter import TaskTier
+
+        # 先用关键词快速过滤明显的自我认知问题
+        self_triggers = [
+            "what are you", "who are you", "what do you do", "introduce yourself",
+            "你是什么", "你是谁", "你做什么", "介绍一下",
+            "你自己", "你本身", "你是一个产品", "你是产品", "crabres是",
+            "about yourself", "about you", "tell me about crabres",
+        ]
+        if any(t in msg.lower() for t in self_triggers):
+            return "self_awareness"
+
+        # 构建对话历史摘要给 LLM 做判断
+        recent_history = ""
+        for m in self.state.message_history[-6:]:
+            role = "User" if m["role"] == "user" else "CrabRes"
+            recent_history += f"{role}: {m['content'][:100]}\n"
+
+        response = await self.llm.generate(
+            system_prompt="""Classify the user's intent into exactly ONE of these categories:
+- self_awareness: User is asking about CrabRes itself (what it is, its capabilities, asking it to do something for itself)
+- greeting: Pure greeting with no substance
+- product: User is describing a product or asking for growth/marketing help
+- followup: User is following up on a previous topic or answering a question
+- chitchat: General chat that doesn't fit above categories
+
+Reply with ONLY the category name, nothing else.""",
+            messages=[{
+                "role": "user",
+                "content": f"Conversation so far:\n{recent_history}\nLatest message: {msg}\n\nClassify the intent:"
+            }],
+            tier=TaskTier.PARSING,
+            max_tokens=20,
+        )
+        intent = response.content.strip().lower().replace('"', '').replace("'", "")
+        # 容错：如果 LLM 返回了意外内容，默认当 followup 处理（进流水线）
+        valid = {"self_awareness", "greeting", "product", "followup", "chitchat"}
+        return intent if intent in valid else "followup"
+
+    async def _self_aware_reply(self, msg: str) -> str:
+        """回答关于 CrabRes 自身的问题（带上下文的 LLM 回复）"""
+        from app.agent.engine.llm_adapter import TaskTier
+
+        lang = "Chinese" if self._language == "zh" else "English"
+        response = await self.llm.generate(
+            system_prompt=f"""You are CrabRes, an AI growth strategy agent AND a product yourself. Respond in {lang}.
+
+About yourself:
+- You are a SaaS product (crab-researcher.vercel.app) that helps indie developers and small teams grow their products
+- You have 13 AI expert advisors covering market research, content strategy, social media, paid ads, partnerships, etc.
+- You can browse the web, search social media, analyze competitors, and execute growth actions (post to Reddit, send emails, etc.)
+- You were built by an indie developer — you understand the struggle of building and growing a product from zero
+- You ARE a product that needs growth strategies too. If someone asks you to create a growth plan for yourself, DO IT — analyze your own market, competitors (like GrowthBook, Jasper, Copy.ai), and suggest real strategies.
+
+Answer the user's question about yourself naturally and honestly. If they're asking you to do something for yourself (like create your own growth strategy), engage with it enthusiastically — you're both the tool and the subject.""",
+            messages=self.state.message_history[-8:],
+            tier=TaskTier.THINKING,
+            max_tokens=500,
+        )
+        return response.content
 
     # ========== 持久化 ==========
 
