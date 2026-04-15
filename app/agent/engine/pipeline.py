@@ -207,13 +207,30 @@ class PipelineRunner:
             self._skill_context = ""
 
         # 🔥 追问检测：如果上一轮已经搜过+有专家输出，新消息是追问/补充信息
-        # → 不重走搜索，直接基于已有数据回答
         has_prior_research = len(self.state.research_data) > 0
         has_prior_experts = len(self.state.expert_outputs) > 0
         is_followup = has_prior_research and len(msg) < 200
 
         if is_followup and (has_prior_research or has_prior_experts):
-            # 追问路径：用已有数据 + 新信息直接回答
+            # 🔥 检测是否是工具请求（用户要求 Agent 执行某个动作）
+            tool_triggers = [
+                "browser", "浏览器", "browse", "打开", "看看", "访问", "scrape",
+                "搜索", "search", "找", "查", "分析", "analyze",
+                "发帖", "post", "发布", "publish", "执行", "execute",
+                "写", "write", "draft", "起草",
+            ]
+            needs_tool = any(t in msg_lower for t in tool_triggers)
+
+            if needs_tool:
+                # 用户要求执行动作 → 调用工具而不是纯文本回答
+                yield {"type": "status", "content": "Executing your request..."}
+                reply = await self._tool_followup(msg)
+                yield {"type": "message", "content": reply}
+                self.state.message_history.append({"role": "assistant", "content": reply})
+                await self._persist()
+                return
+
+            # 普通追问：用已有数据 + 新信息直接回答
             yield {"type": "status", "content": "Updating analysis with your input..."}
             reply = await self._followup_reply(msg)
             yield {"type": "message", "content": reply}
@@ -559,6 +576,14 @@ STRICT FORMAT RULES:
 - Include ONE hard truth — something uncomfortable but true
 - End with 2-3 specific things to do THIS WEEK (not a numbered list of 10)
 - Total length: 3-5 paragraphs. Not more.
+
+SPECIFICITY RULES (CRITICAL — violation = generic garbage):
+- NEVER say "找到3-5个subreddit" — say exactly WHICH subreddits (e.g., r/SideProject has 120K members, r/indiehackers has 95K)
+- NEVER say "回复相关领域的影响者" — say exactly WHO to reply to (e.g., "@levelsio, @marc_louvion, @danshipper")
+- NEVER say "准备200+支持者邮件列表" without saying HOW (e.g., "use your existing Twitter followers + add a waitlist on your landing page")
+- EVERY tactic must include: specific platform + specific community/person + specific format + specific timing
+- If you mention a competitor, include at least ONE specific data point (pricing, traffic, feature)
+- The user should be able to execute your advice in the next 2 hours without googling anything
 
 {getattr(self, '_mood_injection', '')}
 
@@ -944,11 +969,137 @@ Rules:
 - Be concise and conversational, like a smart friend
 - If they gave a constraint (like "no budget"), adjust advice — don't repeat everything
 - No headers, no numbered lists of 10 items
-- 2-3 focused paragraphs max""",
+- 2-3 focused paragraphs max
+
+IMPORTANT: You have real tools available:
+- Web search (search the internet for competitors, market data)
+- Browser (open and analyze competitor websites with screenshots)
+- Social search (search Reddit, HN, Twitter for discussions)
+- Content writing (draft Reddit posts, tweets, emails)
+- Execution (actually post to Reddit, send emails)
+If the user asks you to DO something (browse, search, post, write), acknowledge that you CAN do it and describe what you found/did. NEVER say "I cannot use a browser" or "I'm a text-based AI" — you are an AGENT with real tools.""",
             messages=[
                 {"role": "user", "content": f"Previous research data:\n{research_brief[:1500]}\n\nPrevious expert analysis:\n{expert_brief[:1500]}"},
                 {"role": "assistant", "content": "I have the context from our previous analysis."},
             ] + self.state.message_history[-4:],
+            tier=TaskTier.THINKING,
+            max_tokens=1500,
+        )
+        return response.content
+
+    async def _tool_followup(self, user_message: str) -> str:
+        """用户在追问中要求执行动作（浏览器、搜索、发帖等）→ 调用工具"""
+        from app.agent.engine.llm_adapter import TaskTier
+        import asyncio
+
+        lang = "Chinese" if self._language == "zh" else "English"
+        msg_lower = user_message.lower()
+
+        # 检测具体要做什么
+        browse_triggers = ["browser", "浏览器", "browse", "打开", "访问", "看看竞品", "看一下"]
+        search_triggers = ["搜索", "search", "找", "查"]
+        product_info = self.state.product_info
+
+        result_text = ""
+
+        # 1. 浏览器请求：找一个竞品网站并真正打开
+        if any(t in msg_lower for t in browse_triggers):
+            # 从已有研究数据中提取竞品 URL
+            competitor_url = None
+            competitor_name = None
+
+            # 先从产品信息中的竞品列表找
+            competitors = product_info.get("competitors", [])
+            if competitors and isinstance(competitors, list):
+                comp = competitors[0]
+                if isinstance(comp, dict):
+                    competitor_name = comp.get("name", "")
+                    # 搜索竞品 URL
+                    search_tool = self.tools.get("web_search")
+                    if search_tool and competitor_name:
+                        try:
+                            sr = await asyncio.wait_for(
+                                search_tool.execute(query=f"{competitor_name} official website"),
+                                timeout=15.0
+                            )
+                            if isinstance(sr, dict):
+                                for r in sr.get("results", []):
+                                    url = r.get("url", "")
+                                    if url and "google" not in url and "bing" not in url:
+                                        competitor_url = url
+                                        break
+                        except Exception:
+                            pass
+
+            # 如果找到了 URL，用浏览器打开
+            if competitor_url:
+                browse_tool = self.tools.get("browse_website")
+                scrape_tool = self.tools.get("scrape_website")
+                tool = browse_tool or scrape_tool
+
+                if tool:
+                    try:
+                        browse_result = await asyncio.wait_for(
+                            tool.execute(url=competitor_url),
+                            timeout=30.0
+                        )
+                        if isinstance(browse_result, dict):
+                            title = browse_result.get("title", "")
+                            text = browse_result.get("text", browse_result.get("content", ""))[:1500]
+                            result_text = f"I browsed {competitor_name} ({competitor_url}):\n\nTitle: {title}\nContent preview:\n{text}"
+                        else:
+                            result_text = f"Browsed {competitor_url} but got limited data."
+                    except Exception as e:
+                        result_text = f"Tried to browse {competitor_url} but encountered an error: {str(e)[:100]}"
+                else:
+                    result_text = f"Found competitor {competitor_name} but browser tool is not available in this environment."
+            else:
+                # 没有竞品信息，搜索一下
+                search_tool = self.tools.get("web_search")
+                desc = product_info.get("description", product_info.get("raw_description", ""))
+                if search_tool and desc:
+                    try:
+                        sr = await asyncio.wait_for(
+                            search_tool.execute(query=f"{desc[:80]} competitors"),
+                            timeout=15.0
+                        )
+                        if isinstance(sr, dict):
+                            results = sr.get("results", [])[:3]
+                            result_text = "Searched for competitors:\n" + "\n".join(
+                                f"- {r.get('title', '')}: {r.get('url', '')} — {r.get('content', '')[:100]}"
+                                for r in results
+                            )
+                    except Exception:
+                        result_text = "Search failed, please try again."
+
+        # 2. 搜索请求
+        elif any(t in msg_lower for t in search_triggers):
+            search_tool = self.tools.get("web_search")
+            if search_tool:
+                try:
+                    sr = await asyncio.wait_for(
+                        search_tool.execute(query=user_message[:120]),
+                        timeout=15.0
+                    )
+                    if isinstance(sr, dict):
+                        results = sr.get("results", [])[:5]
+                        result_text = "Search results:\n" + "\n".join(
+                            f"- {r.get('title', '')}: {r.get('url', '')}\n  {r.get('content', '')[:150]}"
+                            for r in results
+                        )
+                except Exception as e:
+                    result_text = f"Search failed: {str(e)[:100]}"
+
+        # 用 LLM 基于工具结果生成自然回复
+        response = await self.llm.generate(
+            system_prompt=f"""You are CrabRes, an AI growth agent. Respond in {lang}.
+You just executed a tool action based on the user's request. Present the results naturally.
+If you browsed a competitor's website, analyze what you found: their positioning, pricing, features, and what the user can learn from it.
+If you searched, highlight the most relevant findings.
+Be specific and data-driven. 2-4 paragraphs.""",
+            messages=self.state.message_history[-6:] + [
+                {{"role": "user", "content": f"Tool execution result:\n{result_text}\n\nUser's original request: {user_message}"}}
+            ],
             tier=TaskTier.THINKING,
             max_tokens=1500,
         )
