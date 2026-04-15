@@ -89,15 +89,24 @@ async def lifespan(app: FastAPI):
     event_bus = await get_event_bus()
     app.state.event_bus = event_bus
 
-    # Telegram 长轮询模式（不依赖公网 Webhook，本地开发也能用）
+    # Telegram 长轮询模式 — 仅在配置了 token 时启动
     from app.channels.telegram_polling import TelegramPoller
     tg_poller = TelegramPoller()
-    await tg_poller.start()
+    if os.environ.get("TELEGRAM_BOT_TOKEN"):
+        await tg_poller.start()
+        logging.info("📱 Telegram poller started")
+    else:
+        logging.info("📱 Telegram poller skipped (no TELEGRAM_BOT_TOKEN)")
     app.state.telegram_poller = tg_poller
 
-    # Playwright 浏览器预热（后台初始化，不阻塞启动）
-    import asyncio
-    asyncio.create_task(_warmup_browser())
+    # Playwright 浏览器预热 — 在 Render 免费版(512MB)上跳过，按需加载
+    import os
+    if os.environ.get("RENDER") is None:
+        # 本地开发环境才预热浏览器
+        import asyncio
+        asyncio.create_task(_warmup_browser())
+    else:
+        logging.info("🌐 Skipping browser warmup on Render (memory-constrained)")
 
     logging.info("🦀 CrabRes Agent Engine started!")
     yield
