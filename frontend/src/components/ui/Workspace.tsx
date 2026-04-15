@@ -38,6 +38,15 @@ interface LogEntry {
   timestamp: number
 }
 
+interface BrowserState {
+  status: 'idle' | 'loading' | 'loaded' | 'error'
+  url?: string
+  title?: string
+  screenshotPath?: string
+  contentPreview?: string
+  error?: string
+}
+
 interface WorkspaceProps {
   /** 是否可见 */
   visible: boolean
@@ -45,9 +54,13 @@ interface WorkspaceProps {
   initialFile?: string | null
   /** Agent 执行日志流 */
   logs?: LogEntry[]
+  /** 变化时自动刷新文件树（从 Chat 组件传入） */
+  refreshKey?: number
+  /** 浏览器实时状态（从 Chat 组件传入） */
+  browserState?: BrowserState
 }
 
-export function Workspace({ visible, initialFile, logs = [] }: WorkspaceProps) {
+export function Workspace({ visible, initialFile, logs = [], refreshKey = 0, browserState }: WorkspaceProps) {
   const [tree, setTree] = useState<FileNode[]>([])
   const [tabs, setTabs] = useState<OpenTab[]>([])
   const [activeTab, setActiveTab] = useState<string | null>(null)
@@ -76,6 +89,14 @@ export function Workspace({ visible, initialFile, logs = [] }: WorkspaceProps) {
       loadStats()
     }
   }, [visible, loadTree, loadStats])
+
+  // refreshKey 变化时自动刷新文件树（由 Chat 组件的 file_created 事件触发）
+  useEffect(() => {
+    if (visible && refreshKey > 0) {
+      loadTree()
+      loadStats()
+    }
+  }, [refreshKey])
 
   // 处理从聊天中点击的文件
   useEffect(() => {
@@ -291,12 +312,53 @@ export function Workspace({ visible, initialFile, logs = [] }: WorkspaceProps) {
                 </div>
               )}
               {bottomTab === 'preview' && (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <GlobeSmallIcon className="w-6 h-6 text-muted mx-auto mb-1 opacity-40" />
-                    <p className="text-[11px] text-muted">Browser preview</p>
-                    <p className="text-[10px] text-muted mt-0.5">Shows when Agent navigates websites</p>
-                  </div>
+                <div className="h-full overflow-y-auto">
+                  {(!browserState || browserState.status === 'idle') ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <GlobeSmallIcon className="w-6 h-6 text-muted mx-auto mb-1 opacity-40" />
+                        <p className="text-[11px] text-muted">Browser preview</p>
+                        <p className="text-[10px] text-muted mt-0.5">Shows when Agent navigates websites</p>
+                      </div>
+                    </div>
+                  ) : browserState.status === 'loading' ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="w-6 h-6 border-2 border-brand/30 border-t-brand rounded-full animate-spin mx-auto mb-2" />
+                        <p className="text-[11px] text-primary font-medium">Navigating...</p>
+                        <p className="text-[10px] text-muted mt-0.5 font-mono max-w-[300px] truncate">{browserState.url}</p>
+                      </div>
+                    </div>
+                  ) : browserState.status === 'loaded' ? (
+                    <div className="p-2 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                        <span className="text-[11px] font-medium text-primary truncate">{browserState.title || 'Page loaded'}</span>
+                      </div>
+                      <p className="text-[10px] text-muted font-mono truncate">{browserState.url}</p>
+                      {browserState.screenshotPath && (
+                        <div className="rounded-lg border border-border overflow-hidden bg-white">
+                          <img
+                            src={`/api/workspace/files/read?path=assets/${browserState.screenshotPath.split('/').pop()}`}
+                            alt="Screenshot"
+                            className="w-full h-auto"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        </div>
+                      )}
+                      {browserState.contentPreview && (
+                        <p className="text-[10px] text-secondary leading-relaxed line-clamp-3">{browserState.contentPreview}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="w-6 h-6 text-red-400 mx-auto mb-1">✕</div>
+                        <p className="text-[11px] text-red-400">Failed to load page</p>
+                        <p className="text-[10px] text-muted mt-0.5">{browserState.error || 'Unknown error'}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

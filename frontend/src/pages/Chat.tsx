@@ -64,6 +64,15 @@ export function Chat({ creature, onBack, onPlan }: ChatProps) {
   const [showWorkspace, setShowWorkspace] = useState(false)
   const [workspaceFile, setWorkspaceFile] = useState<string | null>(null)
   const [agentLogs, setAgentLogs] = useState<LogEntry[]>([])
+  const [workspaceRefreshKey, setWorkspaceRefreshKey] = useState(0)
+  const [browserState, setBrowserState] = useState<{
+    status: 'idle' | 'loading' | 'loaded' | 'error'
+    url?: string
+    title?: string
+    screenshotPath?: string
+    contentPreview?: string
+    error?: string
+  }>({ status: 'idle' })
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -141,6 +150,36 @@ export function Chat({ creature, onBack, onPlan }: ChatProps) {
             // 记录 Agent 日志
             if (event.type === 'status') {
               addLog('action', event.content || '')
+            }
+
+            // 文件创建事件 → 自动刷新 workspace 文件树（不创建聊天消息）
+            if (event.type === 'file_created') {
+              setShowWorkspace(true)
+              addLog('action', `File created: ${event.name || event.path || 'unknown'}`)
+              setWorkspaceRefreshKey(prev => prev + 1)
+              continue
+            }
+
+            // 浏览器事件 → Browser 面板实时展示（不创建聊天消息）
+            if (event.type === 'browser_event') {
+              setShowWorkspace(true)
+              if (event.action === 'navigating') {
+                addLog('browser', `Navigating to ${event.url || ''}`)
+                setBrowserState({ status: 'loading', url: event.url || '' })
+              } else if (event.action === 'loaded') {
+                addLog('browser', `Loaded: ${event.title || event.url || ''}`)
+                setBrowserState({
+                  status: 'loaded',
+                  url: event.url || '',
+                  title: event.title || '',
+                  screenshotPath: event.screenshot_path || '',
+                  contentPreview: event.content_preview || '',
+                })
+              } else if (event.action === 'failed') {
+                addLog('browser', `Failed: ${event.url || ''} — ${event.error || ''}`)
+                setBrowserState({ status: 'error', url: event.url || '', error: event.error || '' })
+              }
+              continue
             }
 
             const newMsg: Message = {
@@ -502,6 +541,8 @@ export function Chat({ creature, onBack, onPlan }: ChatProps) {
               visible={showWorkspace}
               initialFile={workspaceFile}
               logs={agentLogs}
+              refreshKey={workspaceRefreshKey}
+              browserState={browserState}
             />
           </div>
         )}

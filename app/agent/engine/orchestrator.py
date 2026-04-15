@@ -344,10 +344,23 @@ class Orchestrator:
             if time.time() - t0 > self.MAX_RESEARCH_TIME_SEC:
                 break
             yield {"type": "status", "content": f"Browsing {url[:60]}..."}
-            browse_result = await self._safe_tool_call("browse_website", {"url": url})
+            # 推送浏览器开始事件给前端 Browser 面板
+            yield {"type": "browser_event", "action": "navigating", "url": url}
+            browse_result = await self._safe_tool_call("browse_website", {"url": url}, timeout=45.0)
             if browse_result and not browse_result.get("error"):
                 ctx.browse_results.append({"url": url, "result": browse_result})
                 ctx.tool_call_count += 1
+                # 推送浏览器完成事件（含截图路径和页面标题）
+                yield {
+                    "type": "browser_event",
+                    "action": "loaded",
+                    "url": url,
+                    "title": browse_result.get("title", ""),
+                    "screenshot_path": browse_result.get("screenshot_path", ""),
+                    "content_preview": browse_result.get("content_preview", "")[:200],
+                }
+            else:
+                yield {"type": "browser_event", "action": "failed", "url": url, "error": str(browse_result.get("error", "unknown"))[:100]}
 
         # --- LLM 决定补充搜索（如果还有配额） ---
         remaining_calls = self.MAX_RESEARCH_TOOL_CALLS - ctx.tool_call_count
@@ -403,7 +416,8 @@ class Orchestrator:
         lang = "Chinese" if ctx.language == "zh" else "English"
         task = (
             f"Analyze this product and create a growth strategy based on the research data. "
-            f"Respond in {lang}.\n\n"
+            f"Respond in {lang} for explanations, but write any content drafts/templates "
+            f"in the language of the target platform (e.g., English for Reddit/X, Chinese for 小红书).\n\n"
             f"Product: {json.dumps(ctx.product_info, ensure_ascii=False, default=str)[:500]}\n\n"
             f"Research data:\n{research_summary}\n\n"
             f"User request: {ctx.user_message}"
@@ -508,6 +522,7 @@ RULES:
 - Be specific: name actual platforms, subreddits, competitor names found in research
 - Be concise: 200-400 words max
 - End with ONE specific question to help you do deeper research next time
+- Language: Respond in {lang} for explanations, but write content templates in the target platform's language
 """
             response = await self.llm.generate(
                 system_prompt=light_prompt,
@@ -567,6 +582,12 @@ RULES:
                 files_msg_parts = []
                 for d in deliverables:
                     files_msg_parts.append(f"**{d['name']}**: {d['desc']}")
+                    # 推送文件创建事件 → 前端自动刷新文件树
+                    yield {
+                        "type": "file_created",
+                        "path": d.get("path", ""),
+                        "name": d.get("name", ""),
+                    }
                 
                 files_msg = "\n".join(f"- {p}" for p in files_msg_parts)
                 yield {
@@ -692,8 +713,14 @@ Answer naturally and warmly. 2-3 sentences max. Then ask what they're building."
         """构建 CGO 综合 prompt"""
         return f"""You are CrabRes's Chief Growth Officer. You just held a roundtable with {len(ctx.expert_outputs)} experts.
 
-## CRITICAL LANGUAGE RULE
-**You MUST respond ONLY in {lang}.** No exceptions.
+## LANGUAGE STRATEGY
+- **UI/conversation language**: Respond to the user in {lang}.
+- **Content drafts language**: Match the TARGET PLATFORM's primary language:
+  - Reddit / X (Twitter) / Product Hunt / Hacker News → English
+  - 小红书 / 微博 / 知乎 / 微信公众号 → Chinese
+  - LinkedIn → English (or match user's market)
+- When presenting playbooks, use {lang} for explanations but write content templates in the platform's native language.
+- Example: If user speaks Chinese but targets Reddit, explain strategy in Chinese, but write the Reddit post template in English.
 
 ## ROUNDTABLE THREE-PHASE STRUCTURE
 

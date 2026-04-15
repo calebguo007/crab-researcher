@@ -200,12 +200,26 @@ async def agent_chat_stream(
     async def event_generator():
         try:
             async for event in loop.run(req.message, language=req.language):
-                data = json.dumps({
+                # 构建 SSE 事件数据 — 保留所有字段给前端
+                event_data = {
                     "session_id": session_id,
                     "type": event.get("type", "message"),
                     "content": event.get("content", ""),
                     "expert_id": event.get("expert_id"),
-                }, ensure_ascii=False)
+                }
+                # 传递 file_created 事件的额外字段
+                if event.get("type") == "file_created":
+                    event_data["path"] = event.get("path", "")
+                    event_data["name"] = event.get("name", "")
+                # 传递 browser_event 的额外字段
+                if event.get("type") == "browser_event":
+                    event_data["action"] = event.get("action", "")
+                    event_data["url"] = event.get("url", "")
+                    event_data["title"] = event.get("title", "")
+                    event_data["screenshot_path"] = event.get("screenshot_path", "")
+                    event_data["content_preview"] = event.get("content_preview", "")
+                    event_data["error"] = event.get("error", "")
+                data = json.dumps(event_data, ensure_ascii=False)
                 yield f"data: {data}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)[:200], 'session_id': session_id})}\n\n"
