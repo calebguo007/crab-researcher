@@ -32,6 +32,10 @@ class DBGrowthMemory:
 
     def __init__(self, user_id: str = "global"):
         self.user_id = str(user_id)
+        # 兼容 GrowthMemory 接口 — loop.py 用 memory.base_dir 构建 workspace 路径
+        import os
+        render_disk = os.environ.get("RENDER_DISK_PATH", ".crabres")
+        self.base_dir = f"{render_disk}/memory/{user_id}"
 
     def _get_session_factory(self):
         """延迟导入，避免循环依赖"""
