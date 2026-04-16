@@ -39,6 +39,7 @@ from app.agent.experts.copywriter import MasterCopywriter
 from app.agent.experts.critic import StrategyCritic
 from app.agent.experts.designer import DesignExpert
 from app.agent.memory import GrowthMemory
+from app.agent.memory.factory import create_memory
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agent", tags=["Agent"])
@@ -136,7 +137,7 @@ async def agent_chat(
         llm = AgentLLM()
         experts = _get_or_create_experts()
         experts.set_llm(llm)
-        memory = GrowthMemory(base_dir=f".crabres/memory/{user_id}")
+        memory = create_memory(user_id=str(user_id))
         tools = _get_or_create_tools(memory=memory)
         loop = AgentLoop(
             session_id=session_id, llm_service=llm,
@@ -185,7 +186,7 @@ async def agent_chat_stream(
         llm = AgentLLM()
         experts = _get_or_create_experts()
         experts.set_llm(llm)
-        memory = GrowthMemory(base_dir=f".crabres/memory/{user_id}")
+        memory = create_memory(user_id=str(user_id))
         tools = _get_or_create_tools(memory=memory)
         loop = AgentLoop(
             session_id=session_id, llm_service=llm,
@@ -263,25 +264,48 @@ async def get_session_status(
 async def list_sessions(
     current_user: dict = Depends(get_current_user),
 ):
-    """列出用户的所有会话 (包含内存和磁盘)"""
+    """列出用户的所有会话 (内存 + DB)"""
     user_id = current_user.get('user_id', 'default')
-    # loop_state 默认保存在 product/ 目录下
-    memory_path = Path(f".crabres/memory/{user_id}/product")
     
-    # 1. 首先包含内存中的活跃会话
+    # 1. 内存中的活跃会话
     user_sessions = {}
     for sid, loop in _sessions.items():
-        user_sessions[sid] = {
-            "session_id": sid,
-            "phase": loop.state.phase.value,
-            "turn_count": loop.state.turn_count,
-            "is_waiting": loop.state.is_waiting_for_user,
-            "created_at": loop.state.created_at,
-            "last_active_at": loop.state.last_active_at,
-            "is_active": True,
-        }
+        if _session_owners.get(sid) == user_id:
+            user_sessions[sid] = {
+                "session_id": sid,
+                "phase": loop.state.phase.value,
+                "turn_count": loop.state.turn_count,
+                "is_waiting": loop.state.is_waiting_for_user,
+                "created_at": loop.state.created_at,
+                "last_active_at": loop.state.last_active_at,
+                "is_active": True,
+            }
     
-    # 2. 扫描磁盘上的持久化会话
+    # 2. DB 中持久化的会话（通过 memory 查找 loop_state_* 记录）
+    try:
+        memory = create_memory(user_id=str(user_id))
+        keys = await memory.list_memories("product")
+        for key in keys:
+            if key.startswith("loop_state_"):
+                sid = key.replace("loop_state_", "")
+                if sid not in user_sessions:
+                    data = await memory.load(key, category="product")
+                    if data:
+                        user_sessions[sid] = {
+                            "session_id": sid,
+                            "phase": data.get("phase"),
+                            "turn_count": data.get("turn_count"),
+                            "is_waiting": data.get("is_waiting"),
+                            "created_at": data.get("created_at"),
+                            "last_active_at": data.get("last_active_at"),
+                            "is_active": False,
+                            "from_db": True,
+                        }
+    except Exception as e:
+        logger.error(f"Error loading sessions from DB: {e}")
+    
+    # 3. Fallback: 扫描磁盘（兼容旧数据）
+    memory_path = Path(f".crabres/memory/{user_id}/product")
     if memory_path.exists():
         for state_file in memory_path.glob("loop_state_*.json"):
             try:
@@ -300,7 +324,7 @@ async def list_sessions(
                             "from_disk": True
                         }
             except Exception as e:
-                logger.error(f"Error loading session metadata from disk: {e}")
+                logger.error(f"Error loading session from disk: {e}")
                 continue
 
     return {"sessions": list(user_sessions.values())}

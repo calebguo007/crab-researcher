@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
 from app.core.database import engine, Base
+from app.models.growth_memory import MemoryRecord, JournalEntry  # 确保 create_all 发现新表
 from app.api import auth, tasks, monitoring, reports, rag, system, competitors
 from app.api.v2 import agent as agent_v2
 from app.api.v2 import growth_data as growth_data_v2
@@ -87,7 +88,8 @@ async def lifespan(app: FastAPI):
         tools.register(RedditCommentTool())
         tools.register(RedditSearchTool())
         tools.register(SendEmailTool())
-        memory = GrowthMemory(base_dir=".crabres/memory/global")
+        from app.agent.memory.factory import create_memory
+        memory = create_memory(user_id="global")
         llm = AgentLLM(budget_limit_usd=0.1)
         daemon = GrowthDaemon(memory=memory, tools=tools, llm=llm, notifier=NotificationHub())
         await daemon.start()
